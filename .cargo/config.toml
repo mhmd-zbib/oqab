@@ -1,0 +1,9 @@
+[build]
+# Change the target directory (optional)
+target-dir = "build"
+
+[profile.release]
+# Customize release build settings
+lto = true
+codegen-units = 1
+opt-level = 3 
