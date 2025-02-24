@@ -7,7 +7,7 @@ use walkdir::WalkDir;
 pub enum TraverserError {
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
-    #[error("Permission Denied: {0}")]
+    #[error("Permission denied: {0}")]
     PermissionDenied(PathBuf),
     #[error("Invalid path: {0}")]
     InvalidPath(PathBuf),
@@ -34,7 +34,24 @@ impl Traverser {
                             break;
                         }
                     }
-                    Err(_) => break;
+                    Err(err) => {
+                        let path = err.path().map(PathBuf::from).unwrap_or_default();
+                        let error = if let Some(io_err) = err.io_error() {
+                            if io_err.kind() == std::io::ErrorKind::PermissionDenied {
+                                TraverserError::PermissionDenied(path)
+                            } else {
+                                TraverserError::Io(std::io::Error::new(
+                                    io_err.kind(),
+                                    io_err.to_string(),
+                                ))
+                            }
+                        } else {
+                            TraverserError::InvalidPath(path)
+                        };
+                        if tx.send(Err(error)).await.is_err() {
+                            break;
+                        }
+                    }
                 }
             }
         });
