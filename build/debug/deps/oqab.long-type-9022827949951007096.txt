@@ -1,1 +1,0 @@
-rayon::iter::Map<rayon::iter::Filter<rayon::slice::Iter<'_, StringRecord>, {closure@src\main.rs:137:21: 137:29}>, {closure@src\main.rs:138:18: 138:26}>
