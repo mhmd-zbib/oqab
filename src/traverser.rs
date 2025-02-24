@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
-use std::sync::mpsc;
 use thiserror::Error;
+use tokio::sync::mpsc;
+use walkdir::WalkDir;
 
 #[derive(Error, Debug)]
 pub enum TraverserError {
@@ -21,6 +22,22 @@ pub struct Traverser {
 impl Traverser {
     pub fn new<P: AsRef<Path>>(root: P) -> Self {
         let (tx, rx) = mpsc::channel(1024);
+        let root_path = root.as_ref().to_path_buf();
+
+        tokio::spawn(async move {
+            let walker = WalkDir::new(root_path).follow_links(true).into_iter();
+
+            for entry in walker {
+                match entry {
+                    Ok(entry) => {
+                        if tx.send(Ok(entry.into_path())).await.is_err() {
+                            break;
+                        }
+                    }
+                    Err(_) => break;
+                }
+            }
+        });
         Self { rx }
     }
 }
