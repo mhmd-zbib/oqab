@@ -1,6 +1,5 @@
-
 use futures::StreamExt;
-use oqab::traverser::Traverser;
+use oqab::traverser::{Traverser, TraverserConfig};
 use std::path::Path;
 use tokio;
 
@@ -20,7 +19,17 @@ async fn main() {
         std::process::exit(1);
     }
 
-    let mut traverser = Traverser::new(root_path);
+    let config = TraverserConfig {
+        max_depth: None,
+        follow_symlinks: false,
+        exclude_patterns: vec![
+            String::from(".git"),
+            String::from("target"),
+            String::from("node_modules"),
+        ],
+    };
+
+    let mut traverser = Traverser::new(root_path, config);
 
     println!("Starting directory traversal of {}...", root_path.display());
 
