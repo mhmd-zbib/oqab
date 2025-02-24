@@ -13,7 +13,7 @@ path = "src/main.rs"
 
 [[example]]
 name = "traverser_example"
-path = "examples/traverser_example.rs"
+path = "example/traverser_example.rs"
 
 [dependencies]
 tokio = { version = "1.32", features = ["full"] }
