@@ -1,3 +1,9 @@
+use futures::StreamExt;
+use oqab::traverser::Traverser;
+use std::path::Path;
+use tokio;
+
+#[tokio::main]
 fn main() {
     let args: Vec<String> = std::env::args().collect();
 
@@ -14,5 +20,12 @@ fn main() {
     }
 
     println!("Starting directory traversal of {}...", root_path.display());
+    while let Some (result) = traverser.next().await{
+        match result{
+            Ok(path) => println!("Found: {}", path.display),
+            Err(e)=> eprintln!("Error: {}", e)
+        }
+
+    }
     print!("Traversal complete!");
 }
