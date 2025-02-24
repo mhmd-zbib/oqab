@@ -20,12 +20,11 @@ fn main() {
     }
 
     println!("Starting directory traversal of {}...", root_path.display());
-    while let Some (result) = traverser.next().await{
-        match result{
+    while let Some(result) = traverser.next().await {
+        match result {
             Ok(path) => println!("Found: {}", path.display),
-            Err(e)=> eprintln!("Error: {}", e)
+            Err(e) => eprintln!("Error: {}", e),
         }
-
     }
     print!("Traversal complete!");
 }

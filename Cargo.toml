@@ -3,9 +3,17 @@ name = "oqab"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "oqab"
+path = "src/lib.rs"
+
 [[bin]]
 name = "oqab"
 path = "src/main.rs"
+
+[[example]]
+name = "traverser_example"
+path = "examples/traverser_example.rs"
 
 [dependencies]
 tokio = { version = "1.32", features = ["full"] }
@@ -13,3 +21,8 @@ walkdir = "2.4"
 futures = "0.3"
 thiserror = "1.0"
 chrono = "0.4"
+
+
+
+
+
