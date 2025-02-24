@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use thiserror::Error;
 
+#[derive(Error, Debug)]
 pub enum TraverserError {
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
