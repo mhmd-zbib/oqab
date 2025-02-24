@@ -1,4 +1,5 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::sync::mpsc;
 use thiserror::Error;
 
 pub enum TraverserError {
@@ -10,4 +11,15 @@ pub enum TraverserError {
     InvalidPath(PathBuf),
     #[error("Channel closed")]
     ChannelClosed,
+}
+
+pub struct Traverser {
+    rx: mpsc::Receiver<Result<PathBuf, TraverserError>>,
+}
+
+impl Traverser {
+    pub fn new<P: AsRef<Path>>(root: P) -> Self {
+        let (tx, rx) = mpsc::channel(1024);
+        Self { rx }
+    }
 }
