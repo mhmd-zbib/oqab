@@ -1,4 +1,7 @@
 use std::path::{Path, PathBuf};
+use std::pin::Pin;
+use std::task::{Context, Poll};
+use futures::Stream;
 use thiserror::Error;
 use tokio::sync::mpsc;
 use walkdir::WalkDir;
@@ -56,5 +59,13 @@ impl Traverser {
             }
         });
         Self { rx }
+    }
+}
+
+impl Stream for Traverser {
+    type Item = Result<PathBuf, TraverserError>;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        self.rx.poll_recv(cx)
     }
 }
