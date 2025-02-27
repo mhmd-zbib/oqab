@@ -11,16 +11,13 @@ path = "src/lib.rs"
 name = "oqab"
 path = "src/main.rs"
 
-[[example]]
-name = "traverser_example"
-path = "example/traverser_example.rs"
-
 [dependencies]
-tokio = { version = "1.32", features = ["full"] }
-walkdir = "2.4"
-futures = "0.3"
-thiserror = "1.0"
-chrono = "0.4"
+clap = { version = "4.0", features = ["derive"] }
+env_logger = "0.10"
+log = "0.4"
+calamine = "0.21"
+rayon = "1.8"
+num_cpus = "1.16"
 
 
 
