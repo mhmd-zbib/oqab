@@ -6,9 +6,12 @@ use crossbeam::channel::{unbounded, Sender, Receiver};
 use dashmap::DashMap;
 use num_cpus;
 use serde;
+use std::any::Any;
 
 use crate::search::finder::{FileFilter, ExtensionFilter, NameFilter};
 use crate::search::composite::{CompositeFilter, FilterOperation};
+use crate::search::SearchObserver;
+use crate::observers::{ProgressReporter, SilentObserver};
 
 /// Directory traversal strategies
 #[derive(Copy, Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
@@ -63,7 +66,7 @@ pub struct WorkerPool {
 
 impl WorkerPool {
     /// Create a new worker pool with specified number of workers
-    pub fn new(workers_count: usize, filter: Arc<dyn FileFilter>, results: &DashMap<PathBuf, ()>, observer: &Arc<dyn SearchObserver>) -> Self {
+    pub fn new(workers_count: usize, filter: Arc<FilterRegistry>, results: &DashMap<PathBuf, ()>, observer: &Arc<ObserverRegistry>) -> Self {
         let (sender, receiver) = unbounded();
         let receiver = receiver.clone();
         
@@ -88,9 +91,9 @@ impl WorkerPool {
     /// Worker thread main loop
     fn worker_loop(
         receiver: Receiver<WorkerMessage>,
-        filter: Arc<dyn FileFilter>,
+        filter: Arc<FilterRegistry>,
         results: DashMap<PathBuf, ()>,
-        observer: Arc<dyn SearchObserver>,
+        observer: Arc<ObserverRegistry>,
     ) {
         loop {
             match receiver.recv() {
@@ -110,9 +113,9 @@ impl WorkerPool {
     /// Process a directory, finding matching files and queueing subdirectories
     fn process_directory(
         dir: &Path,
-        filter: &Arc<dyn FileFilter>,
+        filter: &Arc<FilterRegistry>,
         results: &DashMap<PathBuf, ()>,
-        observer: &Arc<dyn SearchObserver>,
+        observer: &Arc<ObserverRegistry>,
     ) {
         let entries = match std::fs::read_dir(dir) {
             Ok(entries) => entries,
@@ -161,12 +164,70 @@ impl WorkerPool {
     }
 }
 
+/// Filter registry type to avoid Arc<Box<dyn Trait>> issues
+enum FilterRegistry {
+    Extension(ExtensionFilter),
+    Name(NameFilter),
+    Composite(CompositeFilter),
+}
+
+impl FileFilter for FilterRegistry {
+    fn matches(&self, file_path: &Path) -> bool {
+        match self {
+            FilterRegistry::Extension(filter) => filter.matches(file_path),
+            FilterRegistry::Name(filter) => filter.matches(file_path),
+            FilterRegistry::Composite(filter) => filter.matches(file_path),
+        }
+    }
+}
+
+/// Observer registry to avoid Arc<Box<dyn Trait>> issues
+enum ObserverRegistry {
+    Progress(ProgressReporter),
+    Silent(SilentObserver),
+    Null(NullObserver),
+}
+
+impl SearchObserver for ObserverRegistry {
+    fn on_file_found(&self, file: &Path) {
+        match self {
+            ObserverRegistry::Progress(observer) => observer.on_file_found(file),
+            ObserverRegistry::Silent(observer) => observer.on_file_found(file),
+            ObserverRegistry::Null(observer) => observer.on_file_found(file),
+        }
+    }
+    
+    fn on_directory_entry(&self, dir: &Path, entries_count: usize) {
+        match self {
+            ObserverRegistry::Progress(observer) => observer.on_directory_entry(dir, entries_count),
+            ObserverRegistry::Silent(observer) => observer.on_directory_entry(dir, entries_count),
+            ObserverRegistry::Null(observer) => observer.on_directory_entry(dir, entries_count),
+        }
+    }
+    
+    fn on_error(&self, error: &io::Error, path: &Path) {
+        match self {
+            ObserverRegistry::Progress(observer) => observer.on_error(error, path),
+            ObserverRegistry::Silent(observer) => observer.on_error(error, path),
+            ObserverRegistry::Null(observer) => observer.on_error(error, path),
+        }
+    }
+    
+    fn on_search_complete(&self, found_count: usize, dirs_count: usize, duration_ms: u128) {
+        match self {
+            ObserverRegistry::Progress(observer) => observer.on_search_complete(found_count, dirs_count, duration_ms),
+            ObserverRegistry::Silent(observer) => observer.on_search_complete(found_count, dirs_count, duration_ms),
+            ObserverRegistry::Null(observer) => observer.on_search_complete(found_count, dirs_count, duration_ms),
+        }
+    }
+}
+
 /// Enhanced file finder with parallel processing and caching
 pub struct OqabFileFinder {
     /// Filter to apply to files
-    filter: Arc<dyn FileFilter>,
+    filter: Arc<FilterRegistry>,
     /// Observer for search events
-    observer: Arc<dyn SearchObserver>,
+    observer: Arc<ObserverRegistry>,
     /// Number of worker threads
     workers_count: usize,
     /// Directory traversal strategy
@@ -280,8 +341,8 @@ impl OqabFileFinder {
 
 /// Builder for OqabFileFinder
 pub struct OqabFileFinderBuilder {
-    filter: Option<Arc<dyn FileFilter>>,
-    observer: Option<Arc<dyn SearchObserver>>,
+    filter: Option<Arc<FilterRegistry>>,
+    observer: Option<Arc<ObserverRegistry>>,
     workers_count: usize,
     traversal_strategy: TraversalStrategy,
 }
@@ -298,14 +359,38 @@ impl OqabFileFinderBuilder {
     }
     
     /// Set the file filter
-    pub fn with_filter(mut self, filter: Box<dyn FileFilter>) -> Self {
-        self.filter = Some(Arc::from(filter));
+    pub fn with_extension_filter(mut self, filter: ExtensionFilter) -> Self {
+        self.filter = Some(Arc::new(FilterRegistry::Extension(filter)));
         self
     }
     
-    /// Set the search observer
-    pub fn with_observer(mut self, observer: Box<dyn SearchObserver>) -> Self {
-        self.observer = Some(Arc::from(observer));
+    /// Set a name filter
+    pub fn with_name_filter(mut self, filter: NameFilter) -> Self {
+        self.filter = Some(Arc::new(FilterRegistry::Name(filter)));
+        self
+    }
+    
+    /// Set a composite filter
+    pub fn with_composite_filter(mut self, filter: CompositeFilter) -> Self {
+        self.filter = Some(Arc::new(FilterRegistry::Composite(filter)));
+        self
+    }
+    
+    /// Set a progress reporter
+    pub fn with_progress_reporter(mut self, observer: ProgressReporter) -> Self {
+        self.observer = Some(Arc::new(ObserverRegistry::Progress(observer)));
+        self
+    }
+    
+    /// Set a silent observer
+    pub fn with_silent_observer(mut self, observer: SilentObserver) -> Self {
+        self.observer = Some(Arc::new(ObserverRegistry::Silent(observer)));
+        self
+    }
+    
+    /// Set a null observer
+    pub fn with_null_observer(mut self) -> Self {
+        self.observer = Some(Arc::new(ObserverRegistry::Null(NullObserver)));
         self
     }
     
@@ -324,8 +409,8 @@ impl OqabFileFinderBuilder {
     /// Build the OqabFileFinder
     pub fn build(self) -> OqabFileFinder {
         OqabFileFinder {
-            filter: self.filter.unwrap_or_else(|| Arc::new(Box::new(ExtensionFilter::new("*")) as Box<dyn FileFilter>)),
-            observer: self.observer.unwrap_or_else(|| Arc::new(Box::new(NullObserver) as Box<dyn SearchObserver>)),
+            filter: self.filter.unwrap_or_else(|| Arc::new(FilterRegistry::Extension(ExtensionFilter::new("*")))),
+            observer: self.observer.unwrap_or_else(|| Arc::new(ObserverRegistry::Null(NullObserver))),
             workers_count: self.workers_count,
             traversal_strategy: self.traversal_strategy,
         }
@@ -342,12 +427,34 @@ impl Default for OqabFileFinderBuilder {
 pub struct OqabFinderFactory;
 
 impl OqabFinderFactory {
-    /// Create a finder for a specific file extension
+    /// Create a finder for a specific extension
     pub fn create_extension_finder(extension: &str, observer: Box<dyn SearchObserver>) -> OqabFileFinder {
-        OqabFileFinder::builder()
-            .with_filter(Box::new(ExtensionFilter::new(extension)))
-            .with_observer(observer)
-            .build()
+        let builder = OqabFileFinder::builder()
+            .with_extension_filter(ExtensionFilter::new(extension));
+            
+        // Check the concrete type of the observer using downcasting
+        if let Some(progress) = check_observer_type::<ProgressReporter>(&*observer) {
+            builder.with_progress_reporter(progress).build()
+        } else if let Some(silent) = check_observer_type::<SilentObserver>(&*observer) {
+            builder.with_silent_observer(silent).build()
+        } else {
+            builder.with_null_observer().build()
+        }
+    }
+    
+    /// Create a finder with a name filter and observer
+    pub fn create_name_filter_with_observer(name: &str, observer: Box<dyn SearchObserver>) -> OqabFileFinder {
+        let builder = OqabFileFinder::builder()
+            .with_name_filter(NameFilter::new(name));
+            
+        // Check the concrete type of the observer using downcasting
+        if let Some(progress) = check_observer_type::<ProgressReporter>(&*observer) {
+            builder.with_progress_reporter(progress).build()
+        } else if let Some(silent) = check_observer_type::<SilentObserver>(&*observer) {
+            builder.with_silent_observer(silent).build()
+        } else {
+            builder.with_null_observer().build()
+        }
     }
     
     /// Create a finder for multiple criteria
@@ -356,21 +463,38 @@ impl OqabFinderFactory {
         extension: &str,
         observer: Option<Box<dyn SearchObserver>>
     ) -> OqabFileFinder {
-        let name_filter = Box::new(NameFilter::new(name));
-        let ext_filter = Box::new(ExtensionFilter::new(extension));
+        let name_filter = NameFilter::new(name);
+        let ext_filter = ExtensionFilter::new(extension);
         
-        let composite = Box::new(CompositeFilter::new(
-            name_filter, 
-            ext_filter, 
+        let composite = CompositeFilter::new(
+            Box::new(name_filter.clone()), 
+            Box::new(ext_filter), 
             FilterOperation::And
-        ));
+        );
         
-        let builder = OqabFileFinder::builder().with_filter(composite);
+        let builder = OqabFileFinder::builder()
+            .with_composite_filter(composite);
         
         if let Some(obs) = observer {
-            builder.with_observer(obs).build()
+            // Check the concrete type of the observer using downcasting
+            if let Some(progress) = check_observer_type::<ProgressReporter>(&*obs) {
+                builder.with_progress_reporter(progress).build()
+            } else if let Some(silent) = check_observer_type::<SilentObserver>(&*obs) {
+                builder.with_silent_observer(silent).build()
+            } else {
+                builder.with_null_observer().build()
+            }
         } else {
-            builder.build()
+            builder.with_null_observer().build()
         }
     }
+}
+
+/// Helper function to check observer type
+fn check_observer_type<T: 'static>(observer: &dyn SearchObserver) -> Option<T> 
+where
+    T: SearchObserver + Clone
+{
+    let observer_any = observer as &dyn Any;
+    observer_any.downcast_ref::<T>().cloned()
 } 
