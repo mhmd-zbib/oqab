@@ -1,0 +1,11 @@
+{
+  "path": "src",
+  "file_extension": "rs",
+  "file_name": "advanced",
+  "advanced_search": true,
+  "thread_count": 4,
+  "show_progress": true,
+  "recursive": true,
+  "follow_symlinks": false,
+  "traversal_strategy": "BreadthFirst"
+} 
