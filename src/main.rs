@@ -32,6 +32,11 @@ fn run() -> Result<()> {
     // Process arguments into a configuration
     let config = args.process().context("Failed to process arguments")?;
     
+    // Save configuration if requested
+    if args.save_config_file.is_some() {
+        args.save_config(&config).context("Failed to save configuration")?;
+    }
+    
     // Create and execute the appropriate command
     create_command(&config)?.execute()
 }

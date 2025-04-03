@@ -1,0 +1,11 @@
+{
+  "path": ".",
+  "file_extension": "rs",
+  "file_name": "mod",
+  "advanced_search": false,
+  "thread_count": null,
+  "show_progress": true,
+  "recursive": true,
+  "follow_symlinks": false,
+  "traversal_strategy": null
+}
