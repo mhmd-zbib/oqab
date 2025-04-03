@@ -128,13 +128,13 @@ impl FinderFactory {
     }
     
     /// Create a finder with an extension filter and observer (forwards to advanced finder)
-    pub fn create_extension_finder_with_observer(extension: &str, observer: Box<dyn crate::search::SearchObserver>) -> crate::search::advanced::OqabFileFinder {
+    pub fn create_extension_finder_with_observer(extension: &str, observer: impl crate::search::SearchObserver + 'static) -> crate::search::advanced::OqabFileFinder {
         crate::search::advanced::OqabFinderFactory::create_extension_finder(extension, observer)
     }
     
     /// Create a finder with a name filter and observer (forwards to advanced finder)
-    pub fn create_name_finder_with_observer(name: &str, observer: Box<dyn crate::search::SearchObserver>) -> crate::search::advanced::OqabFileFinder {
-        let filter = Box::new(NameFilter::new(name));
+    pub fn create_name_finder_with_observer(name: &str, observer: impl crate::search::SearchObserver + 'static) -> crate::search::advanced::OqabFileFinder {
+        let filter = NameFilter::new(name);
         crate::search::advanced::OqabFileFinder::builder()
             .with_filter(filter)
             .with_observer(observer)
@@ -142,16 +142,20 @@ impl FinderFactory {
     }
     
     /// Create a finder with both extension and name filters and observer
-    pub fn create_extension_and_name_finder(extension: &str, name: &str, observer: Option<Box<dyn crate::search::SearchObserver>>) -> crate::search::advanced::OqabFileFinder {
+    pub fn create_extension_and_name_finder(
+        extension: &str, 
+        name: &str, 
+        observer: Option<impl crate::search::SearchObserver + 'static>
+    ) -> crate::search::advanced::OqabFileFinder {
         use crate::search::composite::{CompositeFilter, FilterOperation};
         
-        let name_filter = Box::new(NameFilter::new(name));
-        let ext_filter = Box::new(ExtensionFilter::new(extension));
+        let name_filter = NameFilter::new(name);
+        let ext_filter = ExtensionFilter::new(extension);
         
         let composite = CompositeFilter::new(name_filter, ext_filter, FilterOperation::And);
         
         let builder = crate::search::advanced::OqabFileFinder::builder()
-            .with_filter(Box::new(composite));
+            .with_filter(composite);
             
         if let Some(obs) = observer {
             builder.with_observer(obs).build()

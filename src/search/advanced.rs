@@ -298,13 +298,13 @@ impl OqabFileFinderBuilder {
     }
     
     /// Set the file filter
-    pub fn with_filter(mut self, filter: Box<dyn FileFilter>) -> Self {
+    pub fn with_filter(mut self, filter: impl FileFilter + 'static) -> Self {
         self.filter = Some(Arc::new(filter));
         self
     }
     
     /// Set the search observer
-    pub fn with_observer(mut self, observer: Box<dyn SearchObserver>) -> Self {
+    pub fn with_observer(mut self, observer: impl SearchObserver + 'static) -> Self {
         self.observer = Some(Arc::new(observer));
         self
     }
@@ -343,9 +343,9 @@ pub struct OqabFinderFactory;
 
 impl OqabFinderFactory {
     /// Create a finder for a specific file extension
-    pub fn create_extension_finder(extension: &str, observer: Box<dyn SearchObserver>) -> OqabFileFinder {
+    pub fn create_extension_finder(extension: &str, observer: impl SearchObserver + 'static) -> OqabFileFinder {
         OqabFileFinder::builder()
-            .with_filter(Box::new(ExtensionFilter::new(extension)))
+            .with_filter(ExtensionFilter::new(extension))
             .with_observer(observer)
             .build()
     }
@@ -354,16 +354,16 @@ impl OqabFinderFactory {
     pub fn create_combined_finder(
         name: &str,
         extension: &str,
-        observer: Option<Box<dyn SearchObserver>>
+        observer: Option<impl SearchObserver + 'static>
     ) -> OqabFileFinder {
-        let name_filter = Box::new(NameFilter::new(name));
-        let ext_filter = Box::new(ExtensionFilter::new(extension));
+        let name_filter = NameFilter::new(name);
+        let ext_filter = ExtensionFilter::new(extension);
         
-        let composite = Box::new(CompositeFilter::new(
+        let composite = CompositeFilter::new(
             name_filter, 
             ext_filter, 
             FilterOperation::And
-        ));
+        );
         
         let builder = OqabFileFinder::builder().with_filter(composite);
         
