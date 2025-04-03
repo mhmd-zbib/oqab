@@ -3,7 +3,7 @@ use std::path::Path;
 use std::time::Duration;
 
 use oqab::search::FinderFactory;
-use oqab::search::advanced::{HyperFinderFactory, NullObserver};
+use oqab::search::advanced::{OqabFinderFactory, NullObserver};
 
 fn bench_standard_finder(c: &mut Criterion) {
     let mut group = c.benchmark_group("file_finder");
@@ -16,11 +16,11 @@ fn bench_standard_finder(c: &mut Criterion) {
         })
     });
     
-    group.bench_function("hyper_finder", |b| {
+    group.bench_function("oqab_finder", |b| {
         b.iter(|| {
             // Create a new NullObserver in each iteration
             let observer = Box::new(NullObserver);
-            let finder = HyperFinderFactory::create_extension_finder(".rs", observer);
+            let finder = OqabFinderFactory::create_extension_finder(".rs", observer);
             let _ = finder.find(black_box(Path::new(".")));
         })
     });
