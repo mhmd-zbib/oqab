@@ -76,6 +76,9 @@ pub struct HyperFindFilesCommand {
     traversal_strategy: TraversalStrategy,
     show_progress: bool,
     show_errors: bool,
+    max_depth: Option<usize>,
+    skip_hidden: bool,
+    follow_links: bool,
 }
 
 impl HyperFindFilesCommand {
@@ -87,6 +90,9 @@ impl HyperFindFilesCommand {
             traversal_strategy: TraversalStrategy::Standard,
             show_progress: true,
             show_errors: false,
+            max_depth: None,
+            skip_hidden: false,
+            follow_links: true,
         }
     }
     
@@ -107,6 +113,21 @@ impl HyperFindFilesCommand {
     
     pub fn with_error_reporting(mut self, show_errors: bool) -> Self {
         self.show_errors = show_errors;
+        self
+    }
+    
+    pub fn with_max_depth(mut self, depth: Option<usize>) -> Self {
+        self.max_depth = depth;
+        self
+    }
+    
+    pub fn with_skip_hidden(mut self, skip: bool) -> Self {
+        self.skip_hidden = skip;
+        self
+    }
+    
+    pub fn with_follow_links(mut self, follow: bool) -> Self {
+        self.follow_links = follow;
         self
     }
 }
@@ -183,6 +204,8 @@ pub struct FindFilesCommand {
     directory: String,
     extension: String,
     name: Option<String>,
+    max_depth: Option<usize>,
+    skip_hidden: bool,
 }
 
 impl FindFilesCommand {
@@ -191,6 +214,8 @@ impl FindFilesCommand {
             directory, 
             extension,
             name: None,
+            max_depth: None,
+            skip_hidden: false,
         }
     }
     
@@ -198,11 +223,35 @@ impl FindFilesCommand {
         self.name = Some(name);
         self
     }
+    
+    pub fn with_max_depth(mut self, depth: Option<usize>) -> Self {
+        self.max_depth = depth;
+        self
+    }
+    
+    pub fn with_skip_hidden(mut self, skip: bool) -> Self {
+        self.skip_hidden = skip;
+        self
+    }
 }
 
 impl Command for FindFilesCommand {
     fn execute(&self) -> i32 {
         use crate::finder::FinderFactory;
+        
+        // Print search configuration
+        println!("🔍 Standard File Finder");
+        println!("-----------------------");
+        if self.max_depth.is_some() || self.skip_hidden {
+            println!("Search options:");
+            if let Some(depth) = self.max_depth {
+                println!("  - Max depth: {}", depth);
+            }
+            if self.skip_hidden {
+                println!("  - Skipping hidden files/directories");
+            }
+            println!();
+        }
         
         // Create finder with the appropriate filter
         let finder = if let Some(name) = &self.name {
@@ -253,17 +302,24 @@ impl CommandLineParser {
             return Err(format!(
                 "Usage: {} <directory_path> <file_extension> [options]\n\
                 Options:\n\
-                  --fast            Use the faster hyper search implementation\n\
-                  --progress        Show progress during search\n\
-                  --errors          Show directory access errors\n\
-                  --name=<value>    Filter by file name (contains search)\n\
-                  --standard        Use standard directory traversal\n\
-                  --git-aware       Respect .gitignore files (default for --fast)\n\
-                  --breadth-first   Use breadth-first traversal\n\n\
+                  -f, --fast          Use the faster hyper search implementation\n\
+                  -p, --progress      Show progress during search\n\
+                  -e, --errors        Show directory access errors\n\
+                  -n, --name <value>  Filter by file name (contains search)\n\
+                  -r, --recursive     Search directories recursively (default: true)\n\
+                  -d, --depth <num>   Maximum directory depth to search (default: unlimited)\n\
+                  --no-hidden         Skip hidden files and directories\n\
+                  --no-follow-links   Don't follow symbolic links\n\
+                  --traversal <type>  Directory traversal strategy:\n\
+                                       - standard     Default traversal\n\
+                                       - git-aware    Respect .gitignore files (default for --fast)\n\
+                                       - breadth-first Use breadth-first traversal\n\n\
                 Examples:\n\
                   {} . rs                     Find all .rs files in current directory\n\
-                  {} . rs --name=main         Find .rs files containing 'main' in filename\n\
-                  {} /path txt --fast         Find all .txt files with high performance search",
+                  {} . rs -n main             Find .rs files containing 'main' in filename\n\
+                  {} /path txt -f -p          Find all .txt files with fast search and progress\n\
+                  {} . rs --depth 2 --no-hidden  Only search 2 levels deep, skip hidden files",
+                args.get(0).unwrap_or(&"program".to_string()),
                 args.get(0).unwrap_or(&"program".to_string()),
                 args.get(0).unwrap_or(&"program".to_string()),
                 args.get(0).unwrap_or(&"program".to_string()),
@@ -279,24 +335,29 @@ impl CommandLineParser {
             extension = format!(".{}", extension);
         }
         
-        // Process optional flags
-        let use_hyper = args.iter().any(|arg| arg == "--fast");
-        let show_progress = args.iter().any(|arg| arg == "--progress");
-        let show_errors = args.iter().any(|arg| arg == "--errors");
+        // Process optional flags with both short and long forms
+        let use_hyper = args.iter().any(|arg| arg == "--fast" || arg == "-f");
+        let show_progress = args.iter().any(|arg| arg == "--progress" || arg == "-p");
+        let show_errors = args.iter().any(|arg| arg == "--errors" || arg == "-e");
+        let skip_hidden = args.iter().any(|arg| arg == "--no-hidden");
+        let no_follow_links = args.iter().any(|arg| arg == "--no-follow-links");
         
-        // Extract file name if specified
-        let name = args.iter()
-            .filter_map(|arg| {
-                if arg.starts_with("--name=") {
-                    Some(arg[7..].to_string())
-                } else {
-                    None
-                }
-            })
-            .next();
+        // Parse name parameter (supports both formats: --name=value and --name value)
+        let name = Self::extract_parameter_value(args, &["-n", "--name"]);
         
+        // Parse depth parameter
+        let depth = Self::extract_parameter_value(args, &["-d", "--depth"])
+            .and_then(|d| d.parse::<usize>().ok());
+            
         // Determine traversal strategy
-        let traversal_strategy = if args.iter().any(|arg| arg == "--standard") {
+        let traversal_strategy = if let Some(strategy) = Self::extract_parameter_value(args, &["--traversal"]) {
+            match strategy.as_str() {
+                "standard" => TraversalStrategy::Standard,
+                "git-aware" => TraversalStrategy::GitAware,
+                "breadth-first" => TraversalStrategy::BreadthFirst,
+                _ => TraversalStrategy::Standard,
+            }
+        } else if args.iter().any(|arg| arg == "--standard") {
             TraversalStrategy::Standard
         } else if args.iter().any(|arg| arg == "--git-aware") {
             TraversalStrategy::GitAware
@@ -307,11 +368,14 @@ impl CommandLineParser {
         };
         
         if use_hyper || show_progress || name.is_some() {
-            // Create hyper command
+            // Create hyper command with all options
             let mut command = HyperFindFilesCommand::new(directory, extension)
                 .with_traversal_strategy(traversal_strategy)
                 .with_progress(show_progress)
-                .with_error_reporting(show_errors);
+                .with_error_reporting(show_errors)
+                .with_max_depth(depth)
+                .with_skip_hidden(skip_hidden)
+                .with_follow_links(!no_follow_links);
                 
             // Add name filter if specified
             if let Some(name_str) = name {
@@ -320,8 +384,10 @@ impl CommandLineParser {
                 
             Ok(Box::new(command))
         } else {
-            // Use original command
-            let mut command = FindFilesCommand::new(directory, extension);
+            // Use original command - also with new options
+            let mut command = FindFilesCommand::new(directory, extension)
+                .with_max_depth(depth)
+                .with_skip_hidden(skip_hidden);
             
             // Add name filter if specified
             if let Some(name_str) = name {
@@ -330,5 +396,26 @@ impl CommandLineParser {
             
             Ok(Box::new(command))
         }
+    }
+    
+    // Helper method to extract parameter values from command line arguments
+    fn extract_parameter_value(args: &[String], param_flags: &[&str]) -> Option<String> {
+        // First check for combined format like --name=value
+        for arg in args {
+            for &flag in param_flags {
+                if arg.starts_with(&format!("{}=", flag)) {
+                    return Some(arg[flag.len() + 1..].to_string());
+                }
+            }
+        }
+        
+        // Then check for separated format like --name value
+        for i in 0..args.len() - 1 {
+            if param_flags.contains(&args[i].as_str()) {
+                return Some(args[i + 1].clone());
+            }
+        }
+        
+        None
     }
 } 
