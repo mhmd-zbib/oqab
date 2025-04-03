@@ -19,11 +19,11 @@ impl AdvancedSearchCommand {
     }
     
     /// Create an appropriate observer
-    fn create_observer(&self) -> impl SearchObserver + 'static {
+    fn create_observer(&self) -> Box<dyn SearchObserver + 'static> {
         if self.config.show_progress {
-            ProgressReporter::new()
+            Box::new(ProgressReporter::new())
         } else {
-            SilentObserver::new()
+            Box::new(SilentObserver::new())
         }
     }
     
@@ -45,34 +45,23 @@ impl Command for AdvancedSearchCommand {
         // Get the search path
         let search_path = self.config.get_path();
         let path = Path::new(&search_path);
+        let observer = self.create_observer();
         
         // Create finder using factory based on search criteria
         let finder = if let Some(name) = &self.config.file_name {
             if let Some(ext) = &self.config.file_extension {
                 // Find files with both name and extension
-                if self.config.show_progress {
-                    FinderFactory::create_extension_and_name_finder(ext, name, Some(ProgressReporter::new()))
-                } else {
-                    FinderFactory::create_extension_and_name_finder(ext, name, Some(SilentObserver::new()))
-                }
+                FinderFactory::create_extension_and_name_finder(ext, name, Some(observer))
             } else {
                 // Find files with name only
-                if self.config.show_progress {
-                    FinderFactory::create_name_finder_with_observer(name, ProgressReporter::new())
-                } else {
-                    FinderFactory::create_name_finder_with_observer(name, SilentObserver::new())
-                }
+                FinderFactory::create_name_finder_with_observer(name, observer)
             }
         } else if let Some(ext) = &self.config.file_extension {
             // Find files with extension only
-            if self.config.show_progress {
-                FinderFactory::create_extension_finder_with_observer(ext, ProgressReporter::new())
-            } else {
-                FinderFactory::create_extension_finder_with_observer(ext, SilentObserver::new())
-            }
+            FinderFactory::create_extension_finder_with_observer(ext, observer)
         } else {
             // Use wildcard if neither specified (should be caught by validation)
-            FinderFactory::create_extension_finder_with_observer(".*", SilentObserver::new())
+            FinderFactory::create_extension_finder_with_observer(".*", Box::new(SilentObserver::new()))
         };
         
         // Execute the search
