@@ -12,21 +12,37 @@ pub enum FilterOperation {
 
 /// A composite filter that combines two other filters
 pub struct CompositeFilter {
-    filter1: Box<dyn FileFilter>,
-    filter2: Box<dyn FileFilter>,
+    filters: Vec<Box<dyn FileFilter>>,
     operation: FilterOperation,
 }
 
 impl CompositeFilter {
-    /// Create a new composite filter with two filters and an operation
-    pub fn new(
+    /// Create a new composite filter with an operation
+    pub fn new(operation: FilterOperation) -> Self {
+        Self {
+            filters: Vec::new(),
+            operation,
+        }
+    }
+    
+    /// Add a filter to the composite
+    pub fn with_filter(mut self, filter: Box<dyn FileFilter>) -> Self {
+        self.filters.push(filter);
+        self
+    }
+
+    /// Add two filters at once and return the composite filter
+    pub fn new_with_filters(
         filter1: Box<dyn FileFilter>,
         filter2: Box<dyn FileFilter>,
         operation: FilterOperation,
     ) -> Self {
+        let mut filters = Vec::new();
+        filters.push(filter1);
+        filters.push(filter2);
+        
         Self {
-            filter1,
-            filter2,
+            filters,
             operation,
         }
     }
@@ -34,12 +50,16 @@ impl CompositeFilter {
 
 impl FileFilter for CompositeFilter {
     fn matches(&self, file_path: &Path) -> bool {
+        if self.filters.is_empty() {
+            return true; // Empty filter matches everything
+        }
+        
         match self.operation {
             FilterOperation::And => {
-                self.filter1.matches(file_path) && self.filter2.matches(file_path)
+                self.filters.iter().all(|filter| filter.matches(file_path))
             }
             FilterOperation::Or => {
-                self.filter1.matches(file_path) || self.filter2.matches(file_path)
+                self.filters.iter().any(|filter| filter.matches(file_path))
             }
         }
     }

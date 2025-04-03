@@ -2,6 +2,8 @@ use std::path::{Path, PathBuf};
 use anyhow::Result;
 use walkdir::WalkDir;
 use log::debug;
+use crate::search::advanced;
+use crate::SearchObserver;
 
 /// Trait for file filtering logic
 pub trait FileFilter: Send + Sync {
@@ -122,13 +124,13 @@ impl FinderFactory {
         let name_filter = Box::new(NameFilter::new(name_pattern));
         let ext_filter = Box::new(ExtensionFilter::new(extension));
         
-        let composite = CompositeFilter::new(name_filter, ext_filter, FilterOperation::And);
+        let composite = CompositeFilter::new_with_filters(name_filter, ext_filter, FilterOperation::And);
         
         FileFinder::new(Box::new(composite))
     }
     
     /// Create a finder with an extension filter and observer (forwards to advanced finder)
-    pub fn create_extension_finder_with_observer(extension: &str, observer: Box<dyn crate::search::SearchObserver>) -> crate::search::advanced::OqabFileFinder {
+    pub fn create_extension_finder_with_observer(extension: &str, observer: Box<dyn SearchObserver>) -> crate::search::advanced::OqabFileFinder {
         let registry = crate::search::advanced::OqabFinderFactory::create_observer_registry(Some(observer));
         let finder = crate::search::advanced::OqabFileFinder::builder()
             .with_extension_filter(ExtensionFilter::new(extension))
@@ -138,18 +140,20 @@ impl FinderFactory {
     }
     
     /// Create a finder with a name filter and observer (forwards to advanced finder)
-    pub fn create_name_finder_with_observer(name: &str, observer: Box<dyn crate::search::SearchObserver>) -> crate::search::advanced::OqabFileFinder {
+    pub fn create_name_finder_with_observer(name: &str, observer: Box<dyn SearchObserver>) -> crate::search::advanced::OqabFileFinder {
         let registry = crate::search::advanced::OqabFinderFactory::create_observer_registry(Some(observer));
         crate::search::advanced::OqabFinderFactory::create_name_filter_with_observer(name, registry)
     }
     
-    /// Create a finder with both extension and name filters and observer
-    pub fn create_extension_and_name_finder(
-        extension: &str, 
-        name: &str, 
-        observer: Option<Box<dyn crate::search::SearchObserver>>
-    ) -> crate::search::advanced::OqabFileFinder {
-        let registry = crate::search::advanced::OqabFinderFactory::create_observer_registry(observer);
-        crate::search::advanced::OqabFinderFactory::create_combined_finder(name, extension, registry)
+    /// Create a finder with both extension and name filters
+    pub fn create_extension_and_name_finder(extension: &str, name: &str) -> FileFinder {
+        use crate::search::composite::{CompositeFilter, FilterOperation};
+        
+        let name_filter = Box::new(NameFilter::new(name));
+        let ext_filter = Box::new(ExtensionFilter::new(extension));
+        
+        let composite = CompositeFilter::new_with_filters(name_filter, ext_filter, FilterOperation::And);
+        
+        FileFinder::new(Box::new(composite))
     }
 } 
