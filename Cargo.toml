@@ -1,25 +1,9 @@
 [package]
 name = "oqab"
 version = "0.1.0"
-edition = "2021"
-
-[lib]
-name = "oqab"
-path = "src/lib.rs"
-
-[[bin]]
-name = "oqab"
-path = "src/main.rs"
+edition = "2024"
 
 [dependencies]
-clap = { version = "4.0", features = ["derive"] }
-env_logger = "0.10"
-log = "0.4"
-calamine = "0.21"
-rayon = "1.8"
-num_cpus = "1.16"
 
-
-
-
-
+[dev-dependencies]
+tempfile = "3.10.0"
