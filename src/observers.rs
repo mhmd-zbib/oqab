@@ -20,6 +20,15 @@ impl ProgressReporter {
     }
 }
 
+impl Clone for ProgressReporter {
+    fn clone(&self) -> Self {
+        Self {
+            files_found: AtomicUsize::new(self.files_found.load(Ordering::Relaxed)),
+            directories_processed: AtomicUsize::new(self.directories_processed.load(Ordering::Relaxed)),
+        }
+    }
+}
+
 impl Default for ProgressReporter {
     fn default() -> Self {
         Self::new()
@@ -64,6 +73,7 @@ impl SearchObserver for ProgressReporter {
 }
 
 /// Silent observer that doesn't report any progress
+#[derive(Clone)]
 pub struct SilentObserver;
 
 impl SilentObserver {
