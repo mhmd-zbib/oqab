@@ -162,7 +162,7 @@ impl WorkerPool {
 }
 
 /// Enhanced file finder with parallel processing and caching
-pub struct HyperFileFinder {
+pub struct OqabFileFinder {
     /// Filter to apply to files
     filter: Arc<dyn FileFilter>,
     /// Observer for search events
@@ -173,10 +173,10 @@ pub struct HyperFileFinder {
     traversal_strategy: TraversalStrategy,
 }
 
-impl HyperFileFinder {
-    /// Create a new builder for HyperFileFinder
-    pub fn builder() -> HyperFileFinderBuilder {
-        HyperFileFinderBuilder::new()
+impl OqabFileFinder {
+    /// Create a new builder for OqabFileFinder
+    pub fn builder() -> OqabFileFinderBuilder {
+        OqabFileFinderBuilder::new()
     }
     
     /// Find files matching filter in the path
@@ -278,15 +278,15 @@ impl HyperFileFinder {
     }
 }
 
-/// Builder for HyperFileFinder
-pub struct HyperFileFinderBuilder {
+/// Builder for OqabFileFinder
+pub struct OqabFileFinderBuilder {
     filter: Option<Arc<dyn FileFilter>>,
     observer: Option<Arc<dyn SearchObserver>>,
     workers_count: usize,
     traversal_strategy: TraversalStrategy,
 }
 
-impl HyperFileFinderBuilder {
+impl OqabFileFinderBuilder {
     /// Create a new builder
     pub fn new() -> Self {
         Self {
@@ -299,13 +299,13 @@ impl HyperFileFinderBuilder {
     
     /// Set the file filter
     pub fn with_filter(mut self, filter: Box<dyn FileFilter>) -> Self {
-        self.filter = Some(Arc::new(*filter));
+        self.filter = Some(Arc::new(filter));
         self
     }
     
     /// Set the search observer
     pub fn with_observer(mut self, observer: Box<dyn SearchObserver>) -> Self {
-        self.observer = Some(Arc::new(*observer));
+        self.observer = Some(Arc::new(observer));
         self
     }
     
@@ -321,9 +321,9 @@ impl HyperFileFinderBuilder {
         self
     }
     
-    /// Build the HyperFileFinder
-    pub fn build(self) -> HyperFileFinder {
-        HyperFileFinder {
+    /// Build the OqabFileFinder
+    pub fn build(self) -> OqabFileFinder {
+        OqabFileFinder {
             filter: self.filter.unwrap_or_else(|| Arc::new(ExtensionFilter::new("*"))),
             observer: self.observer.unwrap_or_else(|| Arc::new(NullObserver)),
             workers_count: self.workers_count,
@@ -332,19 +332,19 @@ impl HyperFileFinderBuilder {
     }
 }
 
-impl Default for HyperFileFinderBuilder {
+impl Default for OqabFileFinderBuilder {
     fn default() -> Self {
         Self::new()
     }
 }
 
-/// Factory for creating HyperFileFinder instances
-pub struct HyperFinderFactory;
+/// Factory for creating OqabFileFinder instances
+pub struct OqabFinderFactory;
 
-impl HyperFinderFactory {
+impl OqabFinderFactory {
     /// Create a finder for a specific file extension
-    pub fn create_extension_finder(extension: &str, observer: Box<dyn SearchObserver>) -> HyperFileFinder {
-        HyperFileFinder::builder()
+    pub fn create_extension_finder(extension: &str, observer: Box<dyn SearchObserver>) -> OqabFileFinder {
+        OqabFileFinder::builder()
             .with_filter(Box::new(ExtensionFilter::new(extension)))
             .with_observer(observer)
             .build()
@@ -355,7 +355,7 @@ impl HyperFinderFactory {
         name: &str,
         extension: &str,
         observer: Option<Box<dyn SearchObserver>>
-    ) -> HyperFileFinder {
+    ) -> OqabFileFinder {
         let name_filter = Box::new(NameFilter::new(name));
         let ext_filter = Box::new(ExtensionFilter::new(extension));
         
@@ -365,7 +365,7 @@ impl HyperFinderFactory {
             FilterOperation::And
         ));
         
-        let builder = HyperFileFinder::builder().with_filter(composite);
+        let builder = OqabFileFinder::builder().with_filter(composite);
         
         if let Some(obs) = observer {
             builder.with_observer(obs).build()

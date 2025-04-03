@@ -72,7 +72,7 @@ impl Command for AdvancedSearchCommand {
             }
             Err(e) => {
                 error!("Search failed: {}", e);
-                Err(e)
+                Err(anyhow::Error::from(e))
             }
         }
     }
