@@ -2,6 +2,8 @@ use std::env;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
+use rayon::prelude::*;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -41,28 +43,52 @@ fn main() {
 }
 
 fn find_files(root_dir: &str, extension: &str) -> io::Result<Vec<PathBuf>> {
-    let mut matching_files = Vec::new();
-    find_files_recursive(Path::new(root_dir), extension, &mut matching_files)?;
-    Ok(matching_files)
+    let matching_files = Arc::new(Mutex::new(Vec::new()));
+    find_files_recursive(Path::new(root_dir), extension, matching_files.clone())?;
+    
+    // Return the collected files
+    let result = matching_files.lock().unwrap().clone();
+    Ok(result)
 }
 
-fn find_files_recursive(dir: &Path, extension: &str, matching_files: &mut Vec<PathBuf>) -> io::Result<()> {
+fn find_files_recursive(dir: &Path, extension: &str, matching_files: Arc<Mutex<Vec<PathBuf>>>) -> io::Result<()> {
     if dir.is_dir() {
-        for entry in fs::read_dir(dir)? {
-            let entry = entry?;
+        // Read directory entries
+        let entries: Vec<_> = match fs::read_dir(dir) {
+            Ok(entries) => entries.filter_map(Result::ok).collect(),
+            Err(e) => {
+                eprintln!("Warning: Could not access directory {}: {}", dir.display(), e);
+                return Ok(());
+            }
+        };
+        
+        // Process directories in parallel
+        let subdirs: Vec<_> = entries.iter()
+            .filter(|entry| entry.path().is_dir())
+            .map(|entry| entry.path())
+            .collect();
+        
+        // Process files in the current directory
+        for entry in &entries {
             let path = entry.path();
-            
-            if path.is_dir() {
-                // Recursively search subdirectories
-                if let Err(e) = find_files_recursive(&path, extension, matching_files) {
-                    // Log permission errors but don't stop the search
-                    eprintln!("Warning: Could not access directory {}: {}", path.display(), e);
-                }
-            } else if let Some(_ext) = path.extension() {
+            if !path.is_dir() {
                 // Check if file has the requested extension
                 if path.extension().map_or(false, |e| format!(".{}", e.to_string_lossy()).eq_ignore_ascii_case(extension)) {
-                    matching_files.push(path);
+                    let mut files = matching_files.lock().unwrap();
+                    files.push(path);
                 }
+            }
+        }
+        
+        // Process subdirectories in parallel if there are more than a few
+        if subdirs.len() > 3 {
+            subdirs.par_iter().for_each(|subdir| {
+                let _ = find_files_recursive(subdir, extension, Arc::clone(&matching_files));
+            });
+        } else {
+            // Process sequentially for small numbers of directories to avoid overhead
+            for subdir in subdirs {
+                let _ = find_files_recursive(&subdir, extension, Arc::clone(&matching_files));
             }
         }
     }
