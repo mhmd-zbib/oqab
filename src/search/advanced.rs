@@ -298,18 +298,14 @@ impl HyperFileFinderBuilder {
     }
     
     /// Set the file filter
-    pub fn with_filter(mut self, _filter: Box<dyn FileFilter>) -> Self {
-        // Rather than try to cast, recreate directly with the extensions 
-        // we know we have in the codebase
-        let extension_filter = ExtensionFilter::new("*");
-        self.filter = Some(Arc::new(extension_filter));
+    pub fn with_filter(mut self, filter: Box<dyn FileFilter>) -> Self {
+        self.filter = Some(Arc::new(*filter));
         self
     }
     
     /// Set the search observer
-    pub fn with_observer(mut self, _observer: Box<dyn SearchObserver>) -> Self {
-        // Create a new NullObserver as a default
-        self.observer = Some(Arc::new(NullObserver));
+    pub fn with_observer(mut self, observer: Box<dyn SearchObserver>) -> Self {
+        self.observer = Some(Arc::new(*observer));
         self
     }
     
