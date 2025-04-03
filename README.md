@@ -70,31 +70,50 @@ Options:
 
 ### Configuration Files
 
-You can save and load search configurations using JSON files. An example configuration file can be found in the `examples/config.json`:
+You can save and load search configurations using JSON files:
+
+```
+# Save search settings to a config file
+hypersearch -p . -e rs --save-config myconfig.json
+
+# Use settings from a config file
+hypersearch -c myconfig.json
+
+# Load settings but override some options
+hypersearch -c myconfig.json -p /different/path
+```
+
+#### Configuration File Format
+
+Configuration files use JSON format. Here's an example:
 
 ```json
 {
   "path": "src",
   "file_extension": "rs",
-  "file_name": "advanced",
-  "advanced_search": true,
+  "file_name": "mod",
+  "advanced_search": false,
   "thread_count": 4,
   "show_progress": true,
   "recursive": true,
   "follow_symlinks": false,
-  "traversal_strategy": "BreadthFirst"
+  "traversal_strategy": null
 }
 ```
 
-Load a configuration:
-```bash
-hypersearch -c examples/config.json
-```
+Available configuration options:
 
-Save current settings to a configuration file:
-```bash
-hypersearch -e rs -n test --save-config my_search.json
-```
+| Option | Type | Description |
+|--------|------|-------------|
+| path | String | Directory to search in |
+| file_extension | String | File extension to filter by (without the dot) |
+| file_name | String | File name pattern to filter by |
+| advanced_search | Boolean | Whether to use the advanced search algorithm |
+| thread_count | Integer | Number of worker threads for parallel processing |
+| show_progress | Boolean | Whether to display progress during search |
+| recursive | Boolean | Whether to search subdirectories |
+| follow_symlinks | Boolean | Whether to follow symbolic links |
+| traversal_strategy | String | Directory traversal strategy ("BreadthFirst" or "DepthFirst") |
 
 ### Benchmarking
 
