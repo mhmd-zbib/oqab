@@ -9,6 +9,7 @@ A simple Rust utility that recursively searches for files with a specific extens
 - Handles permission errors gracefully
 - Returns a list of all matching files
 - Uses parallel processing for improved performance on large directories
+- Implements multiple design patterns for maintainability and extensibility
 
 ## Usage
 
@@ -29,11 +30,24 @@ Note: If you don't include the dot in the extension, it will be added automatica
 ```
 .
 ├── src/
-│   └── main.rs          # Main application code
+│   ├── main.rs          # Application entry point
+│   ├── lib.rs           # Library exports
+│   ├── finder.rs        # Core file finding functionality
+│   └── cli.rs           # Command-line interface handling
 ├── .gitignore           # Git ignore configuration
 ├── Cargo.toml           # Rust package manifest
 └── README.md            # This documentation
 ```
+
+## Architecture and Design Patterns
+
+This project implements several design patterns to ensure clean architecture and separation of concerns:
+
+1. **Strategy Pattern**: Used for file filtering, allowing different filtering strategies to be implemented
+2. **Command Pattern**: Encapsulates operations as objects with a common interface
+3. **Factory Pattern**: Creates specific finder implementations
+4. **Facade Pattern**: Simplifies the interface for finding files
+5. **Builder Pattern**: Allows customizing finder configuration
 
 ## Development
 
@@ -68,4 +82,12 @@ For improved performance, the application uses parallel processing via the Rayon
 
 - Subdirectories are processed in parallel when there are more than a few
 - Small numbers of directories are processed sequentially to avoid parallelization overhead
-- File checking is done efficiently with proper locking to prevent race conditions 
+- File checking is done efficiently with proper locking to prevent race conditions
+
+### Extensibility
+
+The code is designed to be easily extended:
+
+- To add new file filtering strategies, implement the `FileFilter` trait
+- To add new commands, implement the `Command` trait
+- All components are loosely coupled for easy modification 
