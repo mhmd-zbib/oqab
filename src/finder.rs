@@ -7,9 +7,18 @@ use rayon::prelude::*;
 // Strategy pattern - Interface for file filtering
 pub trait FileFilter: Send + Sync {
     fn matches(&self, path: &Path) -> bool;
+    fn name(&self) -> String;
+    fn clone_box(&self) -> Box<dyn FileFilter>;
+}
+
+impl Clone for Box<dyn FileFilter> {
+    fn clone(&self) -> Self {
+        self.clone_box()
+    }
 }
 
 // Concrete strategy for extension filtering
+#[derive(Clone)]
 pub struct ExtensionFilter {
     extension: String,
 }
@@ -31,6 +40,14 @@ impl FileFilter for ExtensionFilter {
     fn matches(&self, path: &Path) -> bool {
         path.extension()
             .map_or(false, |e| format!(".{}", e.to_string_lossy()).eq_ignore_ascii_case(&self.extension))
+    }
+    
+    fn name(&self) -> String {
+        format!("ExtensionFilter({})", self.extension)
+    }
+    
+    fn clone_box(&self) -> Box<dyn FileFilter> {
+        Box::new(self.clone())
     }
 }
 

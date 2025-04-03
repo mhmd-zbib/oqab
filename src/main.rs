@@ -5,6 +5,9 @@ use oqab::cli::CommandLineParser;
 fn main() {
     let args: Vec<String> = env::args().collect();
     
+    println!("🔍 HyperSearch File Finder");
+    println!("---------------------------");
+    
     // Parse arguments using the Command pattern
     match CommandLineParser::parse_args(&args) {
         Ok(command) => {
