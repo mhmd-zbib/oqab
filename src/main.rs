@@ -60,13 +60,13 @@ fn create_command(config: &FileSearchConfig) -> Result<Box<dyn Command>> {
 
 /// Display a welcome message
 fn display_banner() {
-    println!(" _   _                      _____                     _     ");
-    println!("| | | |                    / ____|                   | |    ");
-    println!("| |_| |_   _ _ __   ___  _| (___   ___  __ _ _ __ ___| |__  ");
-    println!("|  _  | | | | '_ \\ / _ \\| |\\___ \\ / _ \\/ _` | '__/ __| '_ \\ ");
-    println!("| | | | |_| | |_) | (_) | |____) |  __/ (_| | | | (__| | | |");
-    println!("|_| |_|\\__, | .__/ \\___/|_|_____/ \\___|\\__,_|_|  \\___|_| |_|");
-    println!("        __/ | |                                             ");
-    println!("       |___/|_|  File Finder                                ");
+    println!("  ____                 _     ");
+    println!(" / __ \\               | |    ");
+    println!("| |  | | __ _  __ _ _ | |__  ");
+    println!("| |  | |/ _` |/ _` | '| '_ \\ ");
+    println!("| |__| | (_| | (_| | || |_) |");
+    println!(" \\____/ \\__, |\\__,_|_||_.__/ ");
+    println!("         __/ |                ");
+    println!("        |___/  File Finder    ");
     println!();
 }
