@@ -72,6 +72,7 @@ impl SearchObserver for ProgressObserver {
 pub struct HyperFindFilesCommand {
     directory: String,
     extension: String,
+    name: Option<String>,
     traversal_strategy: TraversalStrategy,
     show_progress: bool,
     show_errors: bool,
@@ -82,10 +83,16 @@ impl HyperFindFilesCommand {
         Self { 
             directory, 
             extension,
+            name: None,
             traversal_strategy: TraversalStrategy::Standard,
             show_progress: true,
             show_errors: false,
         }
+    }
+    
+    pub fn with_name(mut self, name: String) -> Self {
+        self.name = Some(name);
+        self
     }
     
     pub fn with_traversal_strategy(mut self, strategy: TraversalStrategy) -> Self {
@@ -112,20 +119,42 @@ impl Command for HyperFindFilesCommand {
             Arc::new(crate::advanced::NullObserver)
         };
         
-        // Create advanced finder with the extension filter and observer
-        let finder = HyperFinderFactory::create_extension_finder_with_observer(
-            &self.extension, 
-            search_observer
-        );
+        // Create advanced finder with the appropriate filters
+        let finder = if let Some(name) = &self.name {
+            // Use name and extension filter
+            HyperFinderFactory::create_name_and_extension_finder(
+                name,
+                &self.extension, 
+                Some(search_observer)
+            )
+        } else {
+            // Use only extension filter
+            HyperFinderFactory::create_extension_finder_with_observer(
+                &self.extension, 
+                search_observer
+            )
+        };
         
         // Execute the search
         match finder.find(&self.directory) {
             Ok(files) => {
                 if !self.show_progress {
                     if files.is_empty() {
-                        println!("No files with extension '{}' found in '{}'", self.extension, self.directory);
+                        if let Some(name) = &self.name {
+                            println!("No files with name '{}' and extension '{}' found in '{}'", 
+                                name, self.extension, self.directory);
+                        } else {
+                            println!("No files with extension '{}' found in '{}'", 
+                                self.extension, self.directory);
+                        }
                     } else {
-                        println!("Found {} file(s) with extension '{}':", files.len(), self.extension);
+                        if let Some(name) = &self.name {
+                            println!("Found {} file(s) with name '{}' and extension '{}':", 
+                                files.len(), name, self.extension);
+                        } else {
+                            println!("Found {} file(s) with extension '{}':", 
+                                files.len(), self.extension);
+                        }
                         for file in files {
                             println!("{}", file.display());
                         }
@@ -153,11 +182,21 @@ impl Command for HyperFindFilesCommand {
 pub struct FindFilesCommand {
     directory: String,
     extension: String,
+    name: Option<String>,
 }
 
 impl FindFilesCommand {
     pub fn new(directory: String, extension: String) -> Self {
-        Self { directory, extension }
+        Self { 
+            directory, 
+            extension,
+            name: None,
+        }
+    }
+    
+    pub fn with_name(mut self, name: String) -> Self {
+        self.name = Some(name);
+        self
     }
 }
 
@@ -165,16 +204,32 @@ impl Command for FindFilesCommand {
     fn execute(&self) -> i32 {
         use crate::finder::FinderFactory;
         
-        // Create finder with the extension filter
-        let finder = FinderFactory::create_extension_finder(&self.extension);
+        // Create finder with the appropriate filter
+        let finder = if let Some(name) = &self.name {
+            FinderFactory::create_name_and_extension_finder(name, &self.extension)
+        } else {
+            FinderFactory::create_extension_finder(&self.extension)
+        };
         
         // Execute the search
         match finder.find(&self.directory) {
             Ok(files) => {
                 if files.is_empty() {
-                    println!("No files with extension '{}' found in '{}'", self.extension, self.directory);
+                    if let Some(name) = &self.name {
+                        println!("No files with name '{}' and extension '{}' found in '{}'", 
+                            name, self.extension, self.directory);
+                    } else {
+                        println!("No files with extension '{}' found in '{}'", 
+                            self.extension, self.directory);
+                    }
                 } else {
-                    println!("Found {} file(s) with extension '{}':", files.len(), self.extension);
+                    if let Some(name) = &self.name {
+                        println!("Found {} file(s) with name '{}' and extension '{}':", 
+                            files.len(), name, self.extension);
+                    } else {
+                        println!("Found {} file(s) with extension '{}':", 
+                            files.len(), self.extension);
+                    }
                     for file in files {
                         println!("{}", file.display());
                     }
@@ -201,9 +256,17 @@ impl CommandLineParser {
                   --fast            Use the faster hyper search implementation\n\
                   --progress        Show progress during search\n\
                   --errors          Show directory access errors\n\
+                  --name=<value>    Filter by file name (contains search)\n\
                   --standard        Use standard directory traversal\n\
                   --git-aware       Respect .gitignore files (default for --fast)\n\
-                  --breadth-first   Use breadth-first traversal",
+                  --breadth-first   Use breadth-first traversal\n\n\
+                Examples:\n\
+                  {} . rs                     Find all .rs files in current directory\n\
+                  {} . rs --name=main         Find .rs files containing 'main' in filename\n\
+                  {} /path txt --fast         Find all .txt files with high performance search",
+                args.get(0).unwrap_or(&"program".to_string()),
+                args.get(0).unwrap_or(&"program".to_string()),
+                args.get(0).unwrap_or(&"program".to_string()),
                 args.get(0).unwrap_or(&"program".to_string())
             ));
         }
@@ -221,6 +284,17 @@ impl CommandLineParser {
         let show_progress = args.iter().any(|arg| arg == "--progress");
         let show_errors = args.iter().any(|arg| arg == "--errors");
         
+        // Extract file name if specified
+        let name = args.iter()
+            .filter_map(|arg| {
+                if arg.starts_with("--name=") {
+                    Some(arg[7..].to_string())
+                } else {
+                    None
+                }
+            })
+            .next();
+        
         // Determine traversal strategy
         let traversal_strategy = if args.iter().any(|arg| arg == "--standard") {
             TraversalStrategy::Standard
@@ -232,17 +306,29 @@ impl CommandLineParser {
             TraversalStrategy::Standard // Default
         };
         
-        if use_hyper || show_progress {
+        if use_hyper || show_progress || name.is_some() {
             // Create hyper command
-            let command = HyperFindFilesCommand::new(directory, extension)
+            let mut command = HyperFindFilesCommand::new(directory, extension)
                 .with_traversal_strategy(traversal_strategy)
                 .with_progress(show_progress)
                 .with_error_reporting(show_errors);
                 
+            // Add name filter if specified
+            if let Some(name_str) = name {
+                command = command.with_name(name_str);
+            }
+                
             Ok(Box::new(command))
         } else {
             // Use original command
-            Ok(Box::new(FindFilesCommand::new(directory, extension)))
+            let mut command = FindFilesCommand::new(directory, extension);
+            
+            // Add name filter if specified
+            if let Some(name_str) = name {
+                command = command.with_name(name_str);
+            }
+            
+            Ok(Box::new(command))
         }
     }
 } 

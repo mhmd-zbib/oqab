@@ -51,6 +51,33 @@ impl FileFilter for ExtensionFilter {
     }
 }
 
+// Concrete strategy for name filtering
+#[derive(Clone)]
+pub struct NameFilter {
+    name: String,
+}
+
+impl NameFilter {
+    pub fn new(name: &str) -> Self {
+        Self { name: name.to_string() }
+    }
+}
+
+impl FileFilter for NameFilter {
+    fn matches(&self, path: &Path) -> bool {
+        path.file_name()
+            .map_or(false, |n| n.to_string_lossy().contains(&self.name))
+    }
+    
+    fn name(&self) -> String {
+        format!("NameFilter({})", self.name)
+    }
+    
+    fn clone_box(&self) -> Box<dyn FileFilter> {
+        Box::new(self.clone())
+    }
+}
+
 // File Finder service (Facade pattern)
 pub struct FileFinder {
     filter: Box<dyn FileFilter>,
@@ -132,6 +159,21 @@ impl FinderFactory {
     pub fn create_extension_finder(extension: &str) -> FileFinder {
         let filter = Box::new(ExtensionFilter::new(extension));
         FileFinder::new(filter)
+    }
+    
+    pub fn create_name_finder(name: &str) -> FileFinder {
+        let filter = Box::new(NameFilter::new(name));
+        FileFinder::new(filter)
+    }
+    
+    pub fn create_name_and_extension_finder(name: &str, extension: &str) -> FileFinder {
+        use crate::composite::{CompositeFilter, FilterOperation};
+        
+        let mut composite = CompositeFilter::new(FilterOperation::And);
+        composite.add_filter(Box::new(ExtensionFilter::new(extension)));
+        composite.add_filter(Box::new(NameFilter::new(name)));
+        
+        FileFinder::new(Box::new(composite))
     }
 }
 

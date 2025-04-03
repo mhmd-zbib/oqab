@@ -10,6 +10,7 @@ use walkdir::WalkDir;
 use num_cpus;
 
 use crate::finder::{FileFilter, ExtensionFilter};
+use crate::composite::CompositeFilter;
 
 // Observer pattern for notifications during search process
 pub trait SearchObserver: Send + Sync {
@@ -286,5 +287,24 @@ impl HyperFinderFactory {
             .with_workers(num_cpus::get())
             .with_traversal_strategy(TraversalStrategy::Standard)
             .build()
+    }
+    
+    pub fn create_name_and_extension_finder(
+        name: &str,
+        extension: &str,
+        observer: Option<Arc<dyn SearchObserver>>
+    ) -> HyperFileFinder {
+        let filter = Box::new(CompositeFilter::with_extension_and_name(extension, name));
+        
+        let builder = HyperFileFinderBuilder::new()
+            .with_filter(filter)
+            .with_workers(num_cpus::get())
+            .with_traversal_strategy(TraversalStrategy::Standard);
+            
+        if let Some(obs) = observer {
+            builder.with_observer(obs).build()
+        } else {
+            builder.build()
+        }
     }
 } 

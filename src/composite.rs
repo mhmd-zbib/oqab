@@ -1,5 +1,5 @@
 use std::path::Path;
-use crate::finder::FileFilter;
+use crate::finder::{FileFilter, ExtensionFilter, NameFilter};
 
 // Composite pattern for combining filters
 #[derive(Clone)]
@@ -24,6 +24,13 @@ impl CompositeFilter {
     
     pub fn add_filter(&mut self, filter: Box<dyn FileFilter>) {
         self.filters.push(filter);
+    }
+    
+    pub fn with_extension_and_name(extension: &str, name: &str) -> Self {
+        let mut composite = Self::new(FilterOperation::And);
+        composite.add_filter(Box::new(ExtensionFilter::new(extension)));
+        composite.add_filter(Box::new(NameFilter::new(name)));
+        composite
     }
 }
 
