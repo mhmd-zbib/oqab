@@ -6,12 +6,6 @@ use crossbeam::channel::{unbounded, Sender, Receiver};
 use dashmap::DashMap;
 use num_cpus;
 use serde;
-use std::any::Any;
-use std::sync::{mpsc, Mutex};
-use std::fs;
-use std::thread;
-use std::time::Instant;
-use std::collections::VecDeque;
 use log::info;
 
 use crate::search::finder::{FileFilter, ExtensionFilter, NameFilter};
@@ -165,7 +159,7 @@ impl WorkerPool {
 }
 
 /// Filter registry type to avoid Arc<Box<dyn Trait>> issues
-enum FilterRegistry {
+pub enum FilterRegistry {
     Extension(ExtensionFilter),
     Name(NameFilter),
     Composite(CompositeFilter),
@@ -340,48 +334,6 @@ impl OqabFileFinder {
         
         Ok(())
     }
-
-    /// Search a directory for matching files
-    fn search_directory(&self, dir: &Path, observer: &Arc<ObserverRegistry>) -> Result<Vec<PathBuf>, std::io::Error> {
-        let start = std::time::Instant::now();
-        let mut entries_vec = Vec::new();
-        
-        match std::fs::read_dir(dir) {
-            Ok(entries) => {
-                // Process all entries
-                for entry in entries {
-                    match entry {
-                        Ok(entry) => {
-                            let path = entry.path();
-                            let metadata = entry.metadata();
-                            
-                            if let Ok(metadata) = metadata {
-                                if metadata.is_file() && self.filter.matches(&path) {
-                                    entries_vec.push(path.clone());
-                                    observer.file_found(&path);
-                                }
-                            }
-                        }
-                        Err(_) => {
-                            // Just log errors but continue with other entries
-                            observer.directory_processed(dir);
-                        }
-                    }
-                }
-            }
-            Err(e) => {
-                // Report the error via observer but continue
-                observer.directory_processed(dir);
-                return Err(e);
-            }
-        };
-        
-        // Report completed directory
-        observer.directory_processed(dir);
-        
-        let elapsed = start.elapsed();
-        Ok(entries_vec)
-    }
 }
 
 /// Builder for OqabFileFinder
@@ -508,7 +460,7 @@ impl OqabFinderFactory {
     }
     
     /// Create a new observer registry from a concrete observer
-    pub fn create_observer_registry(observer: Option<Box<dyn SearchObserver>>) -> Arc<ObserverRegistry> {
+    pub fn create_observer_registry(_observer: Option<Box<dyn SearchObserver>>) -> Arc<ObserverRegistry> {
         // Simplest approach: just use a null observer for all cases
         // In a real application, we would use proper type conversions
         Arc::new(ObserverRegistry::Null(NullObserver))

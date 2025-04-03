@@ -1,7 +1,6 @@
 use std::path::Path;
-use std::io;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use log::{info, error};
+use log::info;
 use crate::SearchObserver;
 
 /// Observer that reports search progress to the console

@@ -4,9 +4,8 @@ use log::info;
 
 use crate::commands::Command;
 use crate::config::FileSearchConfig;
-use crate::search::FinderFactory;
-use crate::{SearchObserver, ObserverRegistry};
-use crate::observers::{ProgressReporter, SilentObserver};
+use crate::ObserverRegistry;
+use crate::observers::ProgressReporter;
 use std::sync::Arc;
 
 /// Command for advanced file searching with progress reporting

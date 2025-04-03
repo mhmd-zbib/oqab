@@ -2,7 +2,6 @@ use std::path::{Path, PathBuf};
 use anyhow::Result;
 use walkdir::WalkDir;
 use log::debug;
-use crate::search::advanced;
 use crate::SearchObserver;
 
 /// Trait for file filtering logic
