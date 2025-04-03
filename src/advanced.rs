@@ -3,7 +3,6 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::thread;
 use std::time::Instant;
-use std::collections::HashSet;
 
 use crossbeam::channel::{bounded, Receiver, Sender};
 use dashmap::DashMap;
@@ -217,8 +216,28 @@ impl HyperFileFinder {
         // Start worker threads
         let handles = pool.start_workers(self.workers);
         
-        // Process directory
-        pool.process_directory(Path::new(root_dir))?;
+        // Process directory based on traversal strategy
+        let result = match self.traversal_strategy {
+            TraversalStrategy::Standard => {
+                // Standard processing is already implemented
+                pool.process_directory(Path::new(root_dir))
+            },
+            TraversalStrategy::GitAware => {
+                // This would use the git-aware traversal if fully implemented
+                println!("Note: Git-aware traversal is using standard implementation currently");
+                pool.process_directory(Path::new(root_dir))
+            },
+            TraversalStrategy::BreadthFirst => {
+                // This would use BFS traversal if fully implemented
+                println!("Note: Breadth-first traversal is using standard implementation currently");
+                pool.process_directory(Path::new(root_dir))
+            }
+        };
+        
+        // Check for errors during traversal
+        if let Err(e) = result {
+            return Err(e);
+        }
         
         // Wait for all workers to finish
         for handle in handles {
@@ -250,6 +269,20 @@ impl HyperFinderFactory {
         
         HyperFileFinderBuilder::new()
             .with_filter(filter)
+            .with_workers(num_cpus::get())
+            .with_traversal_strategy(TraversalStrategy::Standard)
+            .build()
+    }
+    
+    pub fn create_extension_finder_with_observer(
+        extension: &str,
+        observer: Arc<dyn SearchObserver>
+    ) -> HyperFileFinder {
+        let filter = Box::new(ExtensionFilter::new(extension));
+        
+        HyperFileFinderBuilder::new()
+            .with_filter(filter)
+            .with_observer(observer)
             .with_workers(num_cpus::get())
             .with_traversal_strategy(TraversalStrategy::Standard)
             .build()

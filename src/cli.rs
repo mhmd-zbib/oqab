@@ -1,10 +1,9 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::io;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use crate::advanced::{SearchObserver, TraversalStrategy};
-use crate::finder::{FileFilter, ExtensionFilter};
 use crate::advanced::HyperFinderFactory;
 
 // Command pattern
@@ -107,14 +106,17 @@ impl HyperFindFilesCommand {
 
 impl Command for HyperFindFilesCommand {
     fn execute(&self) -> i32 {
-        let observer: Arc<dyn SearchObserver> = if self.show_progress {
+        let search_observer: Arc<dyn SearchObserver> = if self.show_progress {
             Arc::new(ProgressObserver::new(self.show_errors))
         } else {
             Arc::new(crate::advanced::NullObserver)
         };
         
-        // Create advanced finder with the extension filter
-        let finder = HyperFinderFactory::create_extension_finder(&self.extension);
+        // Create advanced finder with the extension filter and observer
+        let finder = HyperFinderFactory::create_extension_finder_with_observer(
+            &self.extension, 
+            search_observer
+        );
         
         // Execute the search
         match finder.find(&self.directory) {
