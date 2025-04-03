@@ -1,4 +1,4 @@
-# HyperSearch File Finder
+# Oqab File Finder
 
 A high-performance, feature-rich file finding utility built in Rust.
 
@@ -18,8 +18,8 @@ A high-performance, feature-rich file finding utility built in Rust.
 
 1. Clone the repository
 ```bash
-git clone https://github.com/yourusername/hypersearch.git
-cd hypersearch
+git clone https://github.com/yourusername/oqab.git
+cd oqab
 ```
 
 2. Build with Cargo
@@ -27,7 +27,7 @@ cd hypersearch
 cargo build --release
 ```
 
-3. The binary will be available in `target/release/hypersearch`
+3. The binary will be available in `target/release/oqab`
 
 ## Usage
 
@@ -35,22 +35,22 @@ cargo build --release
 
 Find all `.rs` files in the current directory:
 ```bash
-hypersearch -e .rs
+oqab -e .rs
 ```
 
 Find files with "config" in their name:
 ```bash
-hypersearch -n config
+oqab -n config
 ```
 
 Search in a specific directory:
 ```bash
-hypersearch -p /path/to/search -e .txt
+oqab -p /path/to/search -e .txt
 ```
 
 Combine extension and name filters:
 ```bash
-hypersearch -e .js -n test
+oqab -e .js -n test
 ```
 
 ### Command Line Options
@@ -74,13 +74,13 @@ You can save and load search configurations using JSON files:
 
 ```
 # Save search settings to a config file
-hypersearch -p . -e rs --save-config myconfig.json
+oqab -p . -e rs --save-config myconfig.json
 
 # Use settings from a config file
-hypersearch -c myconfig.json
+oqab -c myconfig.json
 
 # Load settings but override some options
-hypersearch -c myconfig.json -p /different/path
+oqab -c myconfig.json -p /different/path
 ```
 
 #### Configuration File Format
@@ -117,7 +117,7 @@ Available configuration options:
 
 ### Benchmarking
 
-HyperSearch includes benchmarks to measure and compare the performance of different search implementations:
+Oqab includes benchmarks to measure and compare the performance of different search implementations:
 
 Run all benchmarks:
 ```bash
@@ -128,7 +128,7 @@ This will run performance tests for both the standard file finder and the advanc
 
 ## Architecture
 
-HyperSearch is built with a focus on maintainability, extensibility, and performance:
+Oqab is built with a focus on maintainability, extensibility, and performance:
 
 - **Command Pattern**: Different search implementations are encapsulated in command objects
 - **Strategy Pattern**: Interchangeable filtering strategies

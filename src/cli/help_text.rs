@@ -1,9 +1,9 @@
 /// Returns the detailed help text for the application
 pub fn get_help_text() -> String {
-    r#"HyperSearch File Finder
+    r#"Oqab File Finder
 
 USAGE:
-hypersearch [OPTIONS]
+oqab [OPTIONS]
 
 OPTIONS:
 -h, --help                   Display this help message
@@ -18,28 +18,28 @@ OPTIONS:
 
 EXAMPLES:
 # Find all Rust files in current directory
-hypersearch --path . --ext rs
-hypersearch -p . -e rs
+oqab --path . --ext rs
+oqab -p . -e rs
 
 # Find files with 'config' in the filename
-hypersearch -p . -n config
+oqab -p . -n config
 
 # Find Rust files with 'main' in the filename
-hypersearch -p . -e rs -n main
+oqab -p . -e rs -n main
 
 # Advanced search with silent output
-hypersearch -p /path -a -s -e rs
+oqab -p /path -a -s -e rs
 
 # Use specific number of worker threads
-hypersearch -p . -e rs -w 4
+oqab -p . -e rs -w 4
 
 # Save search settings to a config file
-hypersearch -p . -e rs --save-config myconfig.json
+oqab -p . -e rs --save-config myconfig.json
 
 # Use settings from a config file
-hypersearch -c myconfig.json
+oqab -c myconfig.json
 
 # Load settings but override some options
-hypersearch -c myconfig.json -p /different/path
+oqab -c myconfig.json -p /different/path
 "#.to_string()
 } 

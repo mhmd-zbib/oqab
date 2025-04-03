@@ -4,9 +4,9 @@ use log::info;
 use crate::search::TraversalStrategy;
 use crate::config::FileSearchConfig;
 
-/// Command line arguments for the HyperSearch application
+/// Command line arguments for the Oqab application
 #[derive(Parser, Debug)]
-#[command(name = "HyperSearch")]
+#[command(name = "Oqab")]
 #[command(author = "Dev Team")]
 #[command(version = "1.0.0")]
 #[command(about = "High-performance file finding utility")]
