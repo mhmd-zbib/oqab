@@ -12,6 +12,12 @@ impl HelpCommand {
     }
 }
 
+impl Default for HelpCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Command for HelpCommand {
     fn execute(&self) -> Result<()> {
         // Display help text

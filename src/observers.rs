@@ -20,6 +20,12 @@ impl ProgressReporter {
     }
 }
 
+impl Default for ProgressReporter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SearchObserver for ProgressReporter {
     fn on_file_found(&self, file: &Path) {
         let count = self.files_found.fetch_add(1, Ordering::Relaxed) + 1;
@@ -64,6 +70,12 @@ impl SilentObserver {
     /// Create a new silent observer
     pub fn new() -> Self {
         Self
+    }
+}
+
+impl Default for SilentObserver {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

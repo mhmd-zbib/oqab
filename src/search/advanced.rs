@@ -5,23 +5,19 @@ use std::sync::Arc;
 use crossbeam::channel::{unbounded, Sender, Receiver};
 use dashmap::DashMap;
 use num_cpus;
+use serde;
 
 use crate::search::finder::{FileFilter, ExtensionFilter, NameFilter};
 use crate::search::composite::{CompositeFilter, FilterOperation};
 
 /// Directory traversal strategies
-#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[derive(Copy, Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub enum TraversalStrategy {
     /// Breadth-first traversal (process directories level by level)
+    #[default]
     BreadthFirst,
-    /// Depth-first traversal (process each directory branch fully before moving to siblings)
+    /// Depth-first traversal (process directories recursively)
     DepthFirst,
-}
-
-impl Default for TraversalStrategy {
-    fn default() -> Self {
-        TraversalStrategy::BreadthFirst
-    }
 }
 
 /// Observer for search events
@@ -143,11 +139,9 @@ impl WorkerPool {
         observer.on_directory_entry(dir, entries_vec.len());
         
         for path in entries_vec {
-            if path.is_file() {
-                if filter.matches(&path) {
-                    results.insert(path.clone(), ());
-                    observer.on_file_found(&path);
-                }
+            if path.is_file() && filter.matches(&path) {
+                results.insert(path.clone(), ());
+                observer.on_file_found(&path);
             }
         }
     }
@@ -242,12 +236,10 @@ impl HyperFileFinder {
             // Add subdirectories to the queue
             match std::fs::read_dir(&dir) {
                 Ok(entries) => {
-                    for entry in entries {
-                        if let Ok(entry) = entry {
-                            let path = entry.path();
-                            if path.is_dir() {
-                                queue.push_back(path);
-                            }
+                    for entry in entries.flatten() {
+                        let path = entry.path();
+                        if path.is_dir() {
+                            queue.push_back(path);
                         }
                     }
                 }
@@ -270,12 +262,10 @@ impl HyperFileFinder {
         // Process subdirectories recursively
         match std::fs::read_dir(dir) {
             Ok(entries) => {
-                for entry in entries {
-                    if let Ok(entry) = entry {
-                        let path = entry.path();
-                        if path.is_dir() {
-                            self.depth_first_search(&path, pool, dirs_processed)?;
-                        }
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if path.is_dir() {
+                        self.depth_first_search(&path, pool, dirs_processed)?;
                     }
                 }
             }
@@ -343,6 +333,12 @@ impl HyperFileFinderBuilder {
             workers_count: self.workers_count,
             traversal_strategy: self.traversal_strategy,
         }
+    }
+}
+
+impl Default for HyperFileFinderBuilder {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

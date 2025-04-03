@@ -58,10 +58,10 @@ impl Command for StandardSearchCommand {
             Ok(files) => {
                 self.display_results(files)?;
                 Ok(())
-            }
+            },
             Err(e) => {
-                error!("Search failed: {}", e);
-                Err(e.into())
+                error!("Failed to search for files: {}", e);
+                Err(e)
             }
         }
     }

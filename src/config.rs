@@ -76,4 +76,10 @@ impl FileSearchConfig {
     pub fn get_path(&self) -> String {
         self.path.clone().unwrap_or_else(|| ".".to_string())
     }
+}
+
+impl Default for FileSearchConfig {
+    fn default() -> Self {
+        Self::new()
+    }
 } 
