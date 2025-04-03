@@ -1,7 +1,7 @@
 {
   "path": "src",
   "file_extension": "rs",
-  "file_name": "advanced",
+  "file_name": "mod",
   "advanced_search": true,
   "thread_count": 4,
   "show_progress": true,
