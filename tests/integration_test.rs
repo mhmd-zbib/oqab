@@ -1,6 +1,6 @@
 use std::fs::{self, File};
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use tempfile::TempDir;
 use oqab::core::config::{AppConfig, FileSearchConfig};
 use oqab::core::finder::FileFinder;

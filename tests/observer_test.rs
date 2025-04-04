@@ -1,5 +1,4 @@
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use oqab::core::observer::{SearchObserver, TrackingObserver, SilentObserver};
 
 #[test]
@@ -75,4 +74,4 @@ fn test_observer_trait_object() {
     let found_files = tracking_observer.get_found_files();
     assert_eq!(found_files.len(), 1);
     assert_eq!(found_files[0], PathBuf::from("/path/to/file.txt"));
-} 
+}
