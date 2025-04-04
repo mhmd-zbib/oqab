@@ -8,6 +8,7 @@ use crate::{
         registry::{FilterRegistry, ObserverRegistry},
         traversal::TraversalStrategy,
         worker::WorkerPool,
+        observer::TrackingObserver,
     },
     filters::FilterResult,
 };
@@ -59,55 +60,125 @@ impl FileFinder {
 
     /// Find files in the given directory
     pub fn find(&self, root_dir: &Path) -> Vec<PathBuf> {
-        let found_files = Vec::new();
         let traversal = Arc::clone(&self.traversal_strategy);
         let filters = Arc::clone(&self.filter_registry);
         let observers = Arc::clone(&self.observer_registry);
         
-        let worker_pool = WorkerPool::new(
-            self.config.num_threads,
-            
-            // Directory consumer
-            {
-                let traversal = Arc::clone(&traversal);
-                let filters = Arc::clone(&filters);
-                let observers = Arc::clone(&observers);
-                let config = self.config.clone();
+        // Check if the root directory exists
+        if !root_dir.exists() || !root_dir.is_dir() {
+            return Vec::new();
+        }
+        
+        // For simple cases, process directly without worker pool
+        if self.config.num_threads <= 1 {
+            let mut current_depth = Vec::new();
+            process_directory(
+                root_dir,
+                &traversal,
+                &filters,
+                &observers,
+                &self.config,
+                &mut current_depth,
+            );
+        } else {
+            let worker_pool = WorkerPool::new(
+                self.config.num_threads,
                 
-                move |dir_path| {
-                    process_directory(
-                        &dir_path,
-                        &traversal,
-                        &filters,
-                        &observers,
-                        &config,
-                        &mut Vec::new(),
+                // Directory consumer
+                {
+                    let traversal = Arc::clone(&traversal);
+                    let filters = Arc::clone(&filters);
+                    let observers = Arc::clone(&observers);
+                    let config = self.config.clone();
+                    
+                    move |dir_path| {
+                        process_directory(
+                            &dir_path,
+                            &traversal,
+                            &filters,
+                            &observers,
+                            &config,
+                            &mut Vec::new(),
+                        );
+                    }
+                },
+                
+                // File consumer
+                {
+                    let filters = Arc::clone(&filters);
+                    let observers = Arc::clone(&observers);
+                    
+                    move |file_path| {
+                        if let FilterResult::Accept = filters.apply_all(&file_path) {
+                            observers.notify_file_found(&file_path);
+                        }
+                    }
+                },
+            );
+            
+            // Process the root directory
+            worker_pool.submit_directory(root_dir);
+            worker_pool.complete();
+        }
+        
+        // If we have a TrackingObserver in the registry, we can try to get the results from it
+        // For now, this is a simplification - in a real app we'd want a more robust way to get results
+        if let Some(tracking_observer) = Self::find_tracking_observer(&observers) {
+            tracking_observer.get_found_files()
+        } else {
+            // Fallback: do a simple direct search
+            let mut results = Vec::new();
+            Self::collect_files_direct(
+                root_dir, 
+                &*traversal, 
+                &*filters, 
+                &mut results, 
+                self.config.max_depth.unwrap_or(std::usize::MAX),
+                0
+            );
+            results
+        }
+    }
+    
+    /// Helper to find a TrackingObserver in the registry
+    fn find_tracking_observer(_observer_registry: &ObserverRegistry) -> Option<Arc<TrackingObserver>> {
+        // Implementation depends on ObserverRegistry exposing observers
+        // This is a simplification
+        None
+    }
+    
+    /// Directly collect files matching criteria recursively
+    fn collect_files_direct(
+        dir: &Path,
+        traversal: &dyn TraversalStrategy,
+        filters: &FilterRegistry,
+        results: &mut Vec<PathBuf>,
+        max_depth: usize,
+        current_depth: usize,
+    ) {
+        if current_depth >= max_depth || !traversal.should_process_directory(dir) {
+            return;
+        }
+        
+        if let Ok(entries) = std::fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    Self::collect_files_direct(
+                        &path,
+                        traversal,
+                        filters,
+                        results,
+                        max_depth,
+                        current_depth + 1,
                     );
-                }
-            },
-            
-            // File consumer
-            {
-                let filters = Arc::clone(&filters);
-                let observers = Arc::clone(&observers);
-                
-                move |file_path| {
-                    if let FilterResult::Accept = filters.apply_all(&file_path) {
-                        observers.notify_file_found(&file_path);
-                        // In a real implementation we would collect into found_files
-                        // but we need to wait for worker pool termination
+                } else if path.is_file() && traversal.should_process_file(&path) {
+                    if FilterResult::Accept == filters.apply_all(&path) {
+                        results.push(path);
                     }
                 }
-            },
-        );
-        
-        // Process the root directory
-        worker_pool.submit_directory(root_dir);
-        worker_pool.complete();
-        
-        // In a real implementation we would collect the results from some shared storage
-        // For now, we just return found_files which might be empty
-        found_files
+            }
+        }
     }
 }
 
