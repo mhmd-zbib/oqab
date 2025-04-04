@@ -18,22 +18,20 @@ impl NameFilter {
 
 impl Filter for NameFilter {
     fn filter(&self, path: &Path) -> FilterResult {
+        // Always allow directory traversal
         if path.is_dir() {
             return FilterResult::Accept;
         }
 
-        if let Some(name) = path.file_name() {
-            if let Some(name_str) = name.to_str() {
-                if name_str == self.name || self.name == "*" {
+        // Get the file name
+        match path.file_name() {
+            Some(name) => match name.to_str() {
+                Some(name_str) if name_str == self.name || self.name == "*" => {
                     FilterResult::Accept
-                } else {
-                    FilterResult::Reject
                 }
-            } else {
-                FilterResult::Reject
-            }
-        } else {
-            FilterResult::Reject
+                _ => FilterResult::Reject
+            },
+            None => FilterResult::Reject
         }
     }
 } 
