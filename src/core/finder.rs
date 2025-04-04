@@ -96,7 +96,7 @@ impl FileFinder {
             )).into());
         }
         
-        debug!("Starting search in directory: {}", root_dir.display());
+        debug!("Searching in {}", root_dir.display());
         
         // For simple cases, process directly without worker pool
         if self.config.num_threads <= 1 {
@@ -110,10 +110,10 @@ impl FileFinder {
                 &self.config,
                 &mut current_depth,
             ) {
-                warn!("Error processing root directory: {}", e);
+                warn!("Error processing directory: {}", e);
             }
         } else {
-            debug!("Using multi-threaded mode with {} threads", self.config.num_threads);
+            debug!("Using {} worker threads", self.config.num_threads);
             let worker_pool = WorkerPool::new(
                 self.config.num_threads,
                 
@@ -134,7 +134,7 @@ impl FileFinder {
                             &config,
                             &mut current_depth,
                         ) {
-                            error!("Error processing directory {}: {}", dir_path.display(), e);
+                            error!("Failed to process {}: {}", dir_path.display(), e);
                         }
                     }
                 },
@@ -154,7 +154,7 @@ impl FileFinder {
             
             // Process the root directory
             if !worker_pool.submit_directory(root_dir) {
-                warn!("Failed to submit root directory to worker pool: {}", root_dir.display());
+                warn!("Failed to submit directory to worker pool");
             }
             worker_pool.complete();
             worker_pool.join();
@@ -169,19 +169,19 @@ impl FileFinder {
                     for path in files_guard.iter() {
                         result.push(path.clone());
                     }
-                    debug!("Search completed. Found {} matching files", result.len());
+                    debug!("Found {} matching files", result.len());
                     Ok(result)
                 },
                 Err(e) => {
-                    warn!("Failed to lock found files, falling back to deprecated method: {}", e);
+                    warn!("Failed to lock found files: {}", e);
                     #[allow(deprecated)]
                     let files = tracking_observer.get_found_files();
-                    debug!("Search completed with fallback. Found {} matching files", files.len());
+                    debug!("Using fallback method - found {} files", files.len());
                     Ok(files)
                 }
             }
         } else {
-            debug!("No tracking observer found in registry, falling back to direct collection");
+            debug!("No tracking observer found, using direct collection");
             // Fallback: do a simple direct search
             let mut results = Vec::new();
             if let Err(e) = Self::collect_files_direct(
@@ -192,9 +192,9 @@ impl FileFinder {
                 self.config.max_depth.unwrap_or(usize::MAX),
                 0
             ) {
-                warn!("Error during direct file collection: {}", e);
+                warn!("Direct collection error: {}", e);
             }
-            debug!("Direct collection completed. Found {} matching files", results.len());
+            debug!("Found {} matching files", results.len());
             Ok(results)
         }
     }

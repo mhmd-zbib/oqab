@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 use std::time::Instant;
-use log::{debug, warn, info};
+use log::{debug, warn};
 use anyhow::{Context, Result};
 
 use crate::core::{
@@ -27,7 +27,7 @@ pub fn search_directory(
     config: &FileSearchConfig,
     observer: &dyn SearchObserver
 ) -> Result<Vec<PathBuf>> {
-    info!("Starting standard search in: {}", root_dir.display());
+    debug!("Beginning search in {}", root_dir.display());
     let start_time = Instant::now();
     
     // Check if the root directory exists
@@ -55,18 +55,14 @@ pub fn search_directory(
     };
     
     debug!(
-        "Standard search completed in {:.2}s: found {} files, processed {} directories and {} files",
+        "Search completed in {:.2}s: {} matches, processed {} directories and {} files",
         elapsed.as_secs_f32(),
         result.len(),
         dir_count,
         file_count
     );
     
-    debug!(
-        "Performance: {:.2} files/sec, total time: {:.2}s",
-        files_per_sec,
-        elapsed.as_secs_f32()
-    );
+    debug!("Performance: {:.2} files/sec", files_per_sec);
     
     Ok(result)
 }

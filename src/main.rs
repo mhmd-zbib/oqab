@@ -1,7 +1,7 @@
 use std::process;
 use anyhow::{Context, Result};
 use env_logger::Env;
-use log::{error, info};
+use log::{error, info, LevelFilter};
 
 use oqab::core::config::FileSearchConfig;
 use oqab::commands::{Command, HelpCommand, SearchCommand};
@@ -18,13 +18,25 @@ fn main() {
     
     // Initialize logger with custom environment based on verbosity flags
     let log_level = if args.silent || args.quiet {
-        "warn".to_string()
+        LevelFilter::Warn
     } else {
-        std::env::var("RUST_LOG").unwrap_or_else(|_| "info".to_string())
+        std::env::var("RUST_LOG")
+            .map(|level| level.parse().unwrap_or(LevelFilter::Info))
+            .unwrap_or(LevelFilter::Info)
     };
     
-    env_logger::Builder::from_env(Env::default().default_filter_or(&log_level))
+    env_logger::Builder::from_env(Env::default().default_filter_or("warn"))
         .format_timestamp(None)
+        .format(|buf, record| {
+            use std::io::Write;
+            // Simple format without module path or timestamp
+            if record.level() <= log::Level::Info {
+                writeln!(buf, "{}", record.args())
+            } else {
+                writeln!(buf, "{}: {}", record.level(), record.args())
+            }
+        })
+        .filter(None, log_level)
         .init();
     
     // Display application banner
@@ -66,9 +78,12 @@ fn create_command(config: &FileSearchConfig) -> Result<Box<dyn Command + '_>> {
         return Ok(Box::new(HelpCommand::new()));
     }
     
-    // Create search command
-    info!("Using {} search mode", 
-        if config.advanced_search { "advanced" } else { "standard" });
+    // Create search command without redundant logging
+    if config.advanced_search {
+        info!("Using advanced search mode");
+    } else {
+        info!("Using standard search mode");
+    }
     
     Ok(Box::new(SearchCommand::new(config)))
 }

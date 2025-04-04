@@ -62,8 +62,6 @@ impl Command for SearchCommand<'_> {
         
         // Execute the appropriate search function based on configuration
         if self.config.advanced_search {
-            info!("Using advanced search mode");
-            
             // Create a finder from the factory with the appropriate config
             let finder = FinderFactory::create_standard_finder(&app_config);
             
@@ -73,8 +71,6 @@ impl Command for SearchCommand<'_> {
                 
             self.display_results(&results)?;
         } else {
-            info!("Using standard search mode");
-            
             // Convert AppConfig to FileSearchConfig for the standard search
             let search_config = FileSearchConfig {
                 path: Some(app_config.root_dir.to_string_lossy().to_string()),
