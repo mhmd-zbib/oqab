@@ -114,6 +114,14 @@ impl Args {
     pub fn to_config(&self) -> FileSearchConfig {
         let mut config = FileSearchConfig::new();
         
+        // Apply CLI args to the config
+        self.apply_to_config(&mut config);
+        
+        config
+    }
+    
+    /// Apply CLI arguments to an existing configuration
+    fn apply_to_config(&self, config: &mut FileSearchConfig) {
         // Basic settings
         if let Some(path) = &self.path {
             config.path = Some(path.clone());
@@ -135,8 +143,6 @@ impl Args {
         config.show_progress = !self.quiet;
         config.recursive = !self.no_recursive;
         config.follow_symlinks = self.follow_symlinks;
-        
-        config
     }
     
     /// Process command-line arguments, loading from config file if specified
@@ -212,56 +218,59 @@ impl Args {
     
     /// Merge CLI arguments with a loaded configuration
     fn merge_with_config(&self, loaded: FileSearchConfig) -> FileSearchConfig {
-        let mut merged = self.to_config();
+        let mut merged = loaded.clone();
         
-        // Only use values from loaded config if not specified in CLI
-        if merged.path.is_none() {
-            merged.path = loaded.path;
-        }
-        
-        if merged.file_extension.is_none() {
-            merged.file_extension = loaded.file_extension;
-        }
-        
-        if merged.file_name.is_none() {
-            merged.file_name = loaded.file_name;
-        }
-        
-        // Thread count handling
-        if merged.thread_count.is_none() {
-            merged.thread_count = loaded.thread_count;
-        }
-        
-        // Traversal strategy handling
-        if merged.traversal_strategy.is_none() {
-            merged.traversal_strategy = loaded.traversal_strategy;
-        }
-        
-        // Boolean flag handling is more complex - only override if CLI didn't specify
-        if self.quiet {
-            merged.show_progress = false;
-        } else if !self.quiet && !self.silent {
-            // Keep the loaded setting
-            merged.show_progress = loaded.show_progress;
-        }
-        
-        // Handle recursive flag
-        if self.no_recursive {
-            merged.recursive = false;
-        } else {
-            // Use the loaded setting
-            merged.recursive = loaded.recursive;
-        }
-        
-        // Follow symlinks flag
-        if self.follow_symlinks {
-            merged.follow_symlinks = true;
-        } else {
-            // Use the loaded setting
-            merged.follow_symlinks = loaded.follow_symlinks;
-        }
+        // Apply CLI args to the loaded config
+        // CLI args take precedence over loaded config values
+        self.selective_apply_to_config(&mut merged);
         
         merged
+    }
+    
+    /// Selectively apply CLI arguments to an existing configuration
+    /// Only overrides values that were explicitly set on command line
+    fn selective_apply_to_config(&self, config: &mut FileSearchConfig) {
+        // Path - only override if specified in CLI
+        if let Some(path) = &self.path {
+            config.path = Some(path.clone());
+        }
+        
+        // File extension - only override if specified in CLI
+        if self.extension.is_some() {
+            config.file_extension = self.extension.clone();
+        }
+        
+        // File name - only override if specified in CLI
+        if self.name.is_some() {
+            config.file_name = self.name.clone();
+        }
+        
+        // Thread count - only override if specified in CLI
+        if let Some(threads) = self.workers {
+            config.thread_count = Some(threads);
+        }
+        
+        // Traversal strategy - only override if specified in CLI
+        if let Some(traversal_type) = self.traversal {
+            config.traversal_strategy = Some(traversal_type.into());
+        }
+        
+        // Boolean settings require special handling
+        
+        // Progress - override if quiet flag is set
+        if self.quiet {
+            config.show_progress = false;
+        }
+        
+        // Recursive - override if no-recursive flag is set
+        if self.no_recursive {
+            config.recursive = false;
+        }
+        
+        // Follow symlinks - override if follow-symlinks flag is set
+        if self.follow_symlinks {
+            config.follow_symlinks = true;
+        }
     }
     
     /// Save current configuration to a file
