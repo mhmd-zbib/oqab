@@ -5,14 +5,14 @@ use crate::config::FileSearchConfig;
 use crate::search::SearchService;
 
 /// Command for file searching with configurable options
-pub struct SearchCommand {
-    config: FileSearchConfig,
+pub struct SearchCommand<'a> {
+    config: &'a FileSearchConfig,
     search_service: SearchService,
 }
 
-impl SearchCommand {
+impl<'a> SearchCommand<'a> {
     /// Create a new search command
-    pub fn new(config: FileSearchConfig) -> Self {
+    pub fn new(config: &'a FileSearchConfig) -> Self {
         Self {
             config,
             search_service: SearchService::new(),
@@ -20,14 +20,14 @@ impl SearchCommand {
     }
 }
 
-impl Command for SearchCommand {
+impl<'a> Command for SearchCommand<'a> {
     fn execute(&self) -> Result<()> {
         // Execute the appropriate search based on configuration
         let results = if self.config.advanced_search {
-            self.search_service.execute_advanced_search(&self.config)
+            self.search_service.execute_advanced_search(self.config)
                 .context("Failed to execute advanced search")?
         } else {
-            self.search_service.execute_standard_search(&self.config)
+            self.search_service.execute_standard_search(self.config)
                 .context("Failed to execute standard search")?
         };
             

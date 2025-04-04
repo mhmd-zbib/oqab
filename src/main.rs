@@ -60,7 +60,7 @@ fn create_command(config: &FileSearchConfig) -> Result<Box<dyn Command>> {
     info!("Using {} search mode", 
         if config.advanced_search { "advanced" } else { "standard" });
     
-    Ok(Box::new(SearchCommand::new(config.clone())))
+    Ok(Box::new(SearchCommand::new(config)))
 }
 
 /// Display a welcome message
