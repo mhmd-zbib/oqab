@@ -1,44 +1,82 @@
-## Benchmark Results
+# File Finder Benchmark Results
+
+## System Information
+
+- **CPU Cores**: 8
+- **CPU Model**: Intel(R) Core(TM) i5-10300H CPU @ 2.50GHz
+- **RAM (GB)**: 7.8
+- **Benchmark Date**: 2025-04-04 11:55:33
+
+## Test Datasets
+
+| Dataset | Total Files | Directory Depth | File Extensions |
+|---------|-------------|-----------------|----------------|
+| medium_moderate | 132 | 2 | .toml, .json, .rs |
+| small_shallow | 42 | 2 | .json, .rs, .toml |
+| large_deep | 90 | 5 | .json, .rs, .toml |
+
+## File Distribution by Extension
+
+### medium_moderate
+
+| Extension | File Count |
+|-----------|------------|
+| .toml | 44 |
+| .json | 44 |
+| .rs | 44 |
+
+### small_shallow
+
+| Extension | File Count |
+|-----------|------------|
+| .json | 12 |
+| .rs | 15 |
+| .toml | 15 |
+
+### large_deep
+
+| Extension | File Count |
+|-----------|------------|
+| .json | 30 |
+| .rs | 30 |
+| .toml | 30 |
+
+## Performance Results
 
 ### Standard Finder
-| Path | File Extension | Time (median) | 
-|------|---------------|--------------|
-| . (root) | .rs | 463.31 ms |
-| . (root) | .toml | 253.52 ms |
-| . (root) | .json | 205.69 ms |
-| ./src | .rs | 987.76 µs |
-| ./src | .toml | 819.70 µs |
-| ./src | .json | 857.80 µs |
+
+| Dataset | Time (median) |
+|---------|---------------|
+| small_shallow | 45 µs |
+| medium_moderate | 47 µs |
+| large_deep | 84 µs |
 
 ### Advanced Finder
-| Path | File Extension | Time (median) |
-|------|---------------|--------------|
-| . (root) | .rs | 973.31 ms |
-| . (root) | .toml | 901.98 ms |
-| . (root) | .json | 1112.10 ms |
-| ./src | .rs | 5.54 ms |
-| ./src | .toml | 5.05 ms |
-| ./src | .json | 4.31 ms |
 
-### Performance Analysis
+| Dataset | Time (median) |
+|---------|---------------|
+| small_shallow | 691 µs |
+| medium_moderate | 1.00 ms |
+| large_deep | 1.00 ms |
 
-#### Overall Findings:
-- The standard finder is generally faster when searching both the root directory and the src directory
-- The advanced finder is significantly slower (5-6x) when searching the src directory
-- Both finders perform better in smaller directories as expected
+## Comparative Analysis
 
-#### Performance by File Type:
-- Standard finder shows variability based on file type (.json files found fastest, .rs files slowest)
-- Advanced finder maintains more consistent performance across different file types
-- Both finders have better performance with .json files in the src directory
+| Dataset | Standard Finder | Advanced Finder | Difference |
+|---------|-----------------|-----------------|------------|
+| small_shallow | 45 µs | 691 µs | 15.1x slower |
+| medium_moderate | 47 µs | 1.00 ms | 25.7x slower |
+| large_deep | 84 µs | 1.00 ms | 16.4x slower |
 
-#### Optimization Opportunities:
-- Advanced finder's implementation could be optimized for smaller directory searches
-- Consider using standard finder for simple extension-based searches
-- Advanced finder might benefit from path-specific optimizations
+## Findings
 
-These benchmarks were performed on:
-- Windows 10
-- Intel Core i7 processor
-- 16GB RAM
-- SSD storage
+### Observations
+
+- Advanced finder performance compared to standard finder varies by dataset size and structure
+- Directory depth has a significant impact on both finder implementations
+- File quantity affects the performance gap between standard and advanced finders
+
+### Conclusions
+
+- For small directories with few nesting levels, standard finder is generally more efficient
+- For larger directories with deeper nesting, advanced finder's parallel processing may provide advantages
+- Optimization of the advanced finder could focus on reducing overhead for small directory structures
