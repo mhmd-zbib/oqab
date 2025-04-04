@@ -4,6 +4,7 @@ use thiserror::Error;
 use walkdir::WalkDir;
 use log::{debug, warn, error};
 use crate::SearchObserver;
+use crate::search::composite::TypedCompositeFilter;
 
 /// Errors specific to file finding operations
 #[derive(Error, Debug)]
@@ -160,22 +161,23 @@ pub struct FinderFactory;
 impl FinderFactory {
     /// Create a finder that filters by file extension
     pub fn create_extension_finder(extension: &str) -> FileFinder {
-        FileFinder::new(Box::new(ExtensionFilter::new(extension)))
+        let filter = ExtensionFilter::new(extension);
+        FileFinder::new(Box::new(filter))
     }
     
     /// Create a finder that filters by file name
     pub fn create_name_finder(name_pattern: &str) -> FileFinder {
-        FileFinder::new(Box::new(NameFilter::new(name_pattern)))
+        let filter = NameFilter::new(name_pattern);
+        FileFinder::new(Box::new(filter))
     }
     
     /// Create a finder that filters by both name and extension
     pub fn create_combined_finder(name_pattern: &str, extension: &str) -> FileFinder {
-        use crate::search::composite::{CompositeFilter, FilterOperation};
+        use crate::search::composite::FilterOperation;
         
-        let name_filter = Box::new(NameFilter::new(name_pattern));
-        let ext_filter = Box::new(ExtensionFilter::new(extension));
-        
-        let composite = CompositeFilter::new_with_filters(name_filter, ext_filter, FilterOperation::And);
+        let name_filter = NameFilter::new(name_pattern);
+        let ext_filter = ExtensionFilter::new(extension);
+        let composite = TypedCompositeFilter::new(name_filter, ext_filter, FilterOperation::And);
         
         FileFinder::new(Box::new(composite))
     }

@@ -10,9 +10,20 @@ pub enum FilterOperation {
     Or,
 }
 
-/// A composite filter that combines two other filters
+/// A composite filter that combines multiple filters with boxes
 pub struct CompositeFilter {
     filters: Vec<Box<dyn FileFilter>>,
+    operation: FilterOperation,
+}
+
+/// A type-safe composite filter that combines two specific filter types
+pub struct TypedCompositeFilter<F1, F2>
+where
+    F1: FileFilter,
+    F2: FileFilter,
+{
+    filter1: F1,
+    filter2: F2,
     operation: FilterOperation,
 }
 
@@ -48,6 +59,21 @@ impl CompositeFilter {
     }
 }
 
+impl<F1, F2> TypedCompositeFilter<F1, F2>
+where
+    F1: FileFilter,
+    F2: FileFilter,
+{
+    /// Create a new type-safe composite filter with two existing filters
+    pub fn new(filter1: F1, filter2: F2, operation: FilterOperation) -> Self {
+        Self {
+            filter1,
+            filter2,
+            operation,
+        }
+    }
+}
+
 impl FileFilter for CompositeFilter {
     fn matches(&self, file_path: &Path) -> bool {
         if self.filters.is_empty() {
@@ -62,5 +88,34 @@ impl FileFilter for CompositeFilter {
                 self.filters.iter().any(|filter| filter.matches(file_path))
             }
         }
+    }
+    
+    fn description(&self) -> String {
+        "Composite filter".to_string()
+    }
+}
+
+impl<F1, F2> FileFilter for TypedCompositeFilter<F1, F2>
+where
+    F1: FileFilter,
+    F2: FileFilter,
+{
+    fn matches(&self, file_path: &Path) -> bool {
+        match self.operation {
+            FilterOperation::And => self.filter1.matches(file_path) && self.filter2.matches(file_path),
+            FilterOperation::Or => self.filter1.matches(file_path) || self.filter2.matches(file_path),
+        }
+    }
+    
+    fn description(&self) -> String {
+        format!(
+            "Composite filter: {} {} {}",
+            self.filter1.description(),
+            match self.operation {
+                FilterOperation::And => "AND",
+                FilterOperation::Or => "OR",
+            },
+            self.filter2.description()
+        )
     }
 } 
