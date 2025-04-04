@@ -2,7 +2,7 @@ use std::{
     path::{Path, PathBuf},
     sync::{
         atomic::{AtomicBool, Ordering},
-        mpsc::{channel, Receiver, RecvTimeoutError, Sender, TryRecvError},
+        mpsc::{channel, Sender, TryRecvError},
         Arc, Mutex,
     },
     thread,
@@ -68,7 +68,7 @@ impl WorkerPool {
                         
                         // Process directories first with timeout
                         let dir_msg = match directory_rx.lock() {
-                            Ok(mut rx) => {
+                            Ok(rx) => {
                                 match rx.try_recv() {
                                     Ok(msg) => Some(msg),
                                     Err(TryRecvError::Empty) => None,
@@ -108,7 +108,7 @@ impl WorkerPool {
 
                         // Then process files
                         let file_msg = match file_rx.lock() {
-                            Ok(mut rx) => {
+                            Ok(rx) => {
                                 match rx.try_recv() {
                                     Ok(msg) => Some(msg),
                                     Err(TryRecvError::Empty) => None,
