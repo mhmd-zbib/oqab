@@ -10,6 +10,19 @@ impl HelpCommand {
     pub fn new() -> Self {
         Self
     }
+    
+    /// Display the application banner
+    fn display_banner() {
+        println!("  ____                 _     ");
+        println!(" / __ \\               | |    ");
+        println!("| |  | | __ _  __ _ _ | |__  ");
+        println!("| |  | |/ _` |/ _` | '| '_ \\ ");
+        println!("| |__| | (_| | (_| | || |_) |");
+        println!(" \\____/ \\__, |\\__,_|_||_.__/ ");
+        println!("         __/ |                ");
+        println!("        |___/  File Finder    ");
+        println!();
+    }
 }
 
 impl Default for HelpCommand {
@@ -21,7 +34,7 @@ impl Default for HelpCommand {
 impl Command for HelpCommand {
     fn execute(&self) -> Result<()> {
         // Display banner first
-        crate::display_banner();
+        Self::display_banner();
         
         // Then display help text
         println!("{}", get_help_text());

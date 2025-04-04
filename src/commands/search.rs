@@ -1,5 +1,4 @@
 use anyhow::{Result, Context};
-use log::info;
 use std::time::{Duration, Instant};
 
 use crate::commands::Command;
