@@ -50,7 +50,7 @@ fn run() -> Result<()> {
 }
 
 /// Create the appropriate command based on the configuration
-fn create_command(config: &FileSearchConfig) -> Result<Box<dyn Command>> {
+fn create_command(config: &FileSearchConfig) -> Result<Box<dyn Command + '_>> {
     // Display help if no search criteria provided
     if config.file_extension.is_none() && config.file_name.is_none() {
         return Ok(Box::new(HelpCommand::new()));
