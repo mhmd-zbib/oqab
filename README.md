@@ -1,6 +1,31 @@
 # Oqab File Finder
 
-A high-performance file discovery utility written in Rust, designed for efficient searching and filtering of files across complex directory structures.
+Ever felt like you're looking for a needle in a haystack when searching through hundreds of Excel files across nested directories? Oqab (Arabic for "eagle") is your solution - a high-performance file discovery and content search utility that makes finding information across multiple files as easy as an eagle spotting its prey.
+
+## Why Oqab?
+
+Born from the real-world need to search for specific names or data across hundreds of Excel files scattered in deeply nested directories, Oqab makes this task effortless. Whether you're searching through 100 Excel files across 4 different nested directories or scanning PDFs for specific content, Oqab has got you covered.
+
+## Status: Work in Progress 🚧
+
+While the basic file finding functionality is implemented, we're actively working on these crucial features:
+
+### Coming Soon
+- **Content Search (Main Feature)**:
+  - Deep search within Excel files (.xlsx, .xls)
+  - PDF content search
+  - Pattern matching and regex support for content
+  - Results highlighting and export
+  
+- **Advanced Directory Processing**:
+  - Smart multi-processing for nested directories
+  - Intelligent workload distribution
+  - Progress tracking for deep directory structures
+  
+- **Performance Optimization**:
+  - Smart caching system for frequently accessed directories
+  - Cache invalidation strategies
+  - Memory-efficient file content scanning
 
 ## Overview
 
