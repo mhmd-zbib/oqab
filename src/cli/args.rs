@@ -3,8 +3,8 @@ use anyhow::{Context, Result};
 use thiserror::Error;
 use log::{info, warn, debug};
 use std::path::Path;
-use crate::search::TraversalStrategy;
-use crate::config::FileSearchConfig;
+use crate::core::traversal::TraversalMode;
+use crate::core::config::FileSearchConfig;
 
 /// Errors related to command-line argument processing
 #[derive(Error, Debug)]
@@ -94,11 +94,11 @@ pub enum TraversalType {
     DepthFirst,
 }
 
-impl From<TraversalType> for TraversalStrategy {
+impl From<TraversalType> for TraversalMode {
     fn from(value: TraversalType) -> Self {
         match value {
-            TraversalType::BreadthFirst => TraversalStrategy::BreadthFirst,
-            TraversalType::DepthFirst => TraversalStrategy::DepthFirst,
+            TraversalType::BreadthFirst => TraversalMode::BreadthFirst,
+            TraversalType::DepthFirst => TraversalMode::DepthFirst,
         }
     }
 }
@@ -135,8 +135,9 @@ impl Args {
         }
         
         // Advanced settings
+        config.advanced_search = self.advanced;
         if let Some(traversal_type) = self.traversal {
-            config.traversal_strategy = Some(traversal_type.into());
+            config.traversal_mode = traversal_type.into();
         }
         
         // Other settings
@@ -252,10 +253,15 @@ impl Args {
         
         // Traversal strategy - only override if specified in CLI
         if let Some(traversal_type) = self.traversal {
-            config.traversal_strategy = Some(traversal_type.into());
+            config.traversal_mode = traversal_type.into();
         }
         
         // Boolean settings require special handling
+        
+        // Advanced search - override if advanced flag is set
+        if self.advanced {
+            config.advanced_search = true;
+        }
         
         // Progress - override if quiet flag is set
         if self.quiet {

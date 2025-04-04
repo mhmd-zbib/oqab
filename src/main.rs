@@ -4,7 +4,7 @@ use env_logger::Env;
 use log::{error, info};
 
 use oqab::cli::args::Args;
-use oqab::config::FileSearchConfig;
+use oqab::core::config::FileSearchConfig;
 use oqab::commands::{Command, HelpCommand, SearchCommand};
 
 fn main() {

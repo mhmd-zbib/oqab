@@ -1,16 +1,22 @@
 pub mod commands;
-pub mod config;
-pub mod observers;
-pub mod search;
+pub mod core;
 pub mod cli;
+pub mod filters;
+pub mod utils;
 
 // Re-export main types
 pub use commands::{Command, SearchCommand, HelpCommand};
-pub use config::FileSearchConfig;
-
-// Re-export observer types
-pub use observers::{ProgressReporter, SilentObserver};
-
-// Re-export search traits and utilities
-pub use search::advanced::{SearchObserver, TraversalStrategy, ObserverRegistry, NullObserver};
-pub use search::{FileFilter, FinderFactory, SearchService}; 
+pub use core::{
+    AppConfig,
+    FileSearchConfig,
+    FileFinder,
+    FileFinderBuilder,
+    FinderFactory,
+    SearchObserver,
+    NullObserver,
+    ProgressReporter,
+    SilentObserver,
+    TraversalMode,
+    TraversalStrategy,
+};
+pub use filters::{Filter, FilterResult}; 

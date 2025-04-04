@@ -1,9 +1,11 @@
+use std::path::PathBuf;
+use serde::{Deserialize, Serialize};
+use thiserror::Error;
+use anyhow::{Context, Result};
 use std::fs;
 use std::path::Path;
-use thiserror::Error;
-use serde::{Deserialize, Serialize};
-use anyhow::{Context, Result};
-use crate::search::TraversalStrategy;
+
+use crate::core::traversal::TraversalMode;
 
 /// Errors that can occur during configuration operations
 #[derive(Error, Debug)]
@@ -53,9 +55,9 @@ pub struct FileSearchConfig {
     #[serde(default)]
     pub follow_symlinks: bool,
     
-    /// Advanced options
+    /// Traversal strategy to use
     #[serde(default)]
-    pub traversal_strategy: Option<TraversalStrategy>,
+    pub traversal_mode: TraversalMode,
 }
 
 // Helper functions for serde defaults
@@ -74,7 +76,7 @@ impl FileSearchConfig {
             show_progress: true,
             recursive: true,
             follow_symlinks: false,
-            traversal_strategy: None,
+            traversal_mode: TraversalMode::default(),
         }
     }
     
@@ -113,5 +115,48 @@ impl FileSearchConfig {
 impl Default for FileSearchConfig {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// Application runtime configuration
+#[derive(Debug, Clone)]
+pub struct AppConfig {
+    /// Root directory to search
+    pub root_dir: PathBuf,
+    
+    /// File extension to filter by
+    pub extension: Option<String>,
+    
+    /// File name to filter by
+    pub name: Option<String>,
+    
+    /// Regular expression pattern to filter by
+    pub pattern: Option<String>,
+    
+    /// Minimum file size to filter by
+    pub size: Option<u64>,
+    
+    /// Maximum depth to search
+    pub depth: Option<usize>,
+    
+    /// Number of threads to use
+    pub threads: Option<usize>,
+    
+    /// Whether to follow symbolic links
+    pub follow_links: Option<bool>,
+}
+
+impl Default for AppConfig {
+    fn default() -> Self {
+        Self {
+            root_dir: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
+            extension: None,
+            name: None,
+            pattern: None,
+            size: None,
+            depth: None,
+            threads: Some(num_cpus::get()),
+            follow_links: Some(false),
+        }
     }
 } 

@@ -1,10 +1,13 @@
 pub mod advanced;
-pub mod finder;
-pub mod composite;
-pub mod service;
+pub mod filter;
+pub mod standard;
 
-// Re-export key types for easier access
-pub use advanced::{ObserverRegistry, TraversalStrategy};
-pub use finder::{FinderFactory, FileFilter};
-pub use composite::CompositeFilter;
-pub use service::SearchService; 
+// Re-export common types
+pub use self::advanced::{
+    OqabFileFinder, 
+    OqabFileFinderBuilder, 
+    OqabFinderFactory,
+    SearchObserver,
+    TraversalStrategy,
+};
+pub use self::filter::{Filter, FilterResult}; 
