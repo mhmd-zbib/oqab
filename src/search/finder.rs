@@ -1,13 +1,35 @@
 use std::path::{Path, PathBuf};
 use anyhow::Result;
+use thiserror::Error;
 use walkdir::WalkDir;
-use log::debug;
+use log::{debug, warn, error};
 use crate::SearchObserver;
+
+/// Errors specific to file finding operations
+#[derive(Error, Debug)]
+pub enum FinderError {
+    #[error("Failed to access path: {0}")]
+    AccessError(String),
+    
+    #[error("Invalid search path: {0}")]
+    InvalidPath(String),
+    
+    #[error("Traversal error: {0}")]
+    TraversalError(String),
+    
+    #[error("Operation error: {0}")]
+    OperationError(String),
+}
 
 /// Trait for file filtering logic
 pub trait FileFilter: Send + Sync {
     /// Check if a file matches the filter criteria
     fn matches(&self, file_path: &Path) -> bool;
+    
+    /// Get a description of this filter
+    fn description(&self) -> String {
+        "Generic file filter".to_string()
+    }
 }
 
 /// Basic file finder that traverses directories and applies filters
@@ -25,20 +47,42 @@ impl FileFinder {
     pub fn find(&self, search_path: &Path) -> Result<Vec<PathBuf>> {
         let mut results = Vec::new();
         
-        debug!("Searching in: {}", search_path.display());
+        // Validate the search path
+        if !search_path.exists() {
+            return Err(FinderError::InvalidPath(search_path.display().to_string()).into());
+        }
         
-        for entry in WalkDir::new(search_path)
+        debug!("Searching in: {} with filter: {}", 
+            search_path.display(), 
+            self.filter.description());
+        
+        // Perform the walk
+        let walker = WalkDir::new(search_path)
             .follow_links(true)
-            .into_iter()
-            .filter_map(|e| e.ok())
-        {
-            // Skip directories
-            if entry.file_type().is_file() {
-                let path = entry.path();
-                
-                // Apply filter
-                if self.filter.matches(path) {
-                    results.push(path.to_path_buf());
+            .into_iter();
+        
+        for entry_result in walker {
+            match entry_result {
+                Ok(entry) => {
+                    // Skip directories
+                    if entry.file_type().is_file() {
+                        let path = entry.path();
+                        
+                        // Apply filter
+                        if self.filter.matches(path) {
+                            results.push(path.to_path_buf());
+                        }
+                    }
+                },
+                Err(err) => {
+                    // Log error but continue searching
+                    warn!("Error during directory traversal: {}", err);
+                    
+                    // Check if this is a permission error - match on error type
+                    if err.to_string().contains("permission denied") || 
+                       err.to_string().contains("access denied") {
+                        return Err(FinderError::AccessError(err.to_string()).into());
+                    }
                 }
             }
         }
@@ -76,6 +120,10 @@ impl FileFilter for ExtensionFilter {
         }
         false
     }
+    
+    fn description(&self) -> String {
+        format!("Extension filter: {}", self.extension)
+    }
 }
 
 /// Filter for file names
@@ -99,6 +147,10 @@ impl FileFilter for NameFilter {
             }
         }
         false
+    }
+    
+    fn description(&self) -> String {
+        format!("Name filter: {}", self.name_pattern)
     }
 }
 

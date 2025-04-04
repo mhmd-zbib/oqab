@@ -134,6 +134,7 @@ fn get_system_info() -> HashMap<String, String> {
                     info.insert("RAM (GB)".to_string(), format!("{:.1}", ram_gb));
                 }
             }
+
         }
     }
     
@@ -382,3 +383,4 @@ fn bench_file_finders(c: &mut Criterion) {
 
 criterion_group!(benches, bench_file_finders);
 criterion_main!(benches); 
+

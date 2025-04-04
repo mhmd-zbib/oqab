@@ -1,8 +1,26 @@
 use clap::{Parser, ValueEnum};
 use anyhow::{Context, Result};
-use log::info;
+use thiserror::Error;
+use log::{info, warn, debug};
+use std::path::Path;
 use crate::search::TraversalStrategy;
 use crate::config::FileSearchConfig;
+
+/// Errors related to command-line argument processing
+#[derive(Error, Debug)]
+pub enum ArgsError {
+    #[error("Failed to parse command line arguments: {0}")]
+    ParseError(String),
+    
+    #[error("Failed to load configuration: {0}")]
+    ConfigLoadError(String),
+    
+    #[error("Failed to save configuration: {0}")]
+    ConfigSaveError(String),
+    
+    #[error("Invalid argument value: {0}")]
+    InvalidValue(String),
+}
 
 /// Command line arguments for the Oqab application
 #[derive(Parser, Debug)]
@@ -88,7 +106,8 @@ impl From<TraversalType> for TraversalStrategy {
 impl Args {
     /// Parse command line arguments
     pub fn parse() -> Result<Self> {
-        Ok(Self::try_parse()?)
+        Self::try_parse()
+            .map_err(|e| ArgsError::ParseError(e.to_string()).into())
     }
     
     /// Convert CLI arguments to a search configuration
@@ -109,10 +128,7 @@ impl Args {
         
         // Advanced settings
         if let Some(traversal_type) = self.traversal {
-            config.traversal_strategy = Some(match traversal_type {
-                TraversalType::BreadthFirst => TraversalStrategy::BreadthFirst,
-                TraversalType::DepthFirst => TraversalStrategy::DepthFirst,
-            });
+            config.traversal_strategy = Some(traversal_type.into());
         }
         
         // Other settings
@@ -123,48 +139,75 @@ impl Args {
         config
     }
     
-    /// Process the config file if specified
-    pub fn process_config_file(&self) -> Result<Option<FileSearchConfig>> {
-        // Check if config file is specified
-        if let Some(config_path) = &self.config_file {
-            let path_str = config_path.clone();
-            
-            if let Some(_save_path) = &self.save_config_file {
-                // We'll save the config later, but return None for now
-                return Ok(None);
-            }
-            
-            // Load configuration from file
-            let config = FileSearchConfig::load_from_file(&path_str)
-                .context("Failed to load configuration file")?;
-                
-            return Ok(Some(config));
-        }
-        
-        // No config file specified
-        Ok(None)
-    }
-    
     /// Process command-line arguments, loading from config file if specified
     pub fn process(&self) -> Result<FileSearchConfig> {
+        // Validate required arguments
+        self.validate()?;
+        
         // First convert CLI args to a config
         let mut config = self.to_config();
         
         // If a config file is specified, load and merge it
         if let Some(config_file) = &self.config_file {
+            // Check if the config file exists
+            let path = Path::new(config_file);
+            if !path.exists() {
+                return Err(ArgsError::ConfigLoadError(
+                    format!("Config file not found: {}", config_file)
+                ).into());
+            }
+            
             let loaded_config = FileSearchConfig::load_from_file(config_file)
-                .context("Failed to load configuration file")?;
+                .with_context(|| format!("Failed to load configuration file: {}", config_file))?;
             
             // Merge the loaded config with CLI args (CLI args take precedence)
             config = self.merge_with_config(loaded_config);
+            debug!("Merged configuration from file and command line arguments");
         }
         
         // Process the save config request if present
-        if let Some(_save_path) = &self.save_config_file {
-            // Implementation omitted for brevity
+        if let Some(save_path) = &self.save_config_file {
+            debug!("Will save configuration to: {}", save_path);
         }
         
+        // Final validation
+        self.validate_config(&config)?;
+        
         Ok(config)
+    }
+    
+    /// Validate command-line arguments
+    fn validate(&self) -> Result<()> {
+        // Validate worker threads
+        if let Some(workers) = self.workers {
+            if workers == 0 {
+                return Err(ArgsError::InvalidValue(
+                    "Worker thread count must be greater than 0".to_string()
+                ).into());
+            }
+        }
+        
+        // Validate that path exists if specified
+        if let Some(path) = &self.path {
+            let p = Path::new(path);
+            if !p.exists() {
+                return Err(ArgsError::InvalidValue(
+                    format!("Specified path does not exist: {}", path)
+                ).into());
+            }
+        }
+        
+        Ok(())
+    }
+    
+    /// Validate the generated configuration
+    fn validate_config(&self, config: &FileSearchConfig) -> Result<()> {
+        // Check if search criteria is present
+        if config.file_extension.is_none() && config.file_name.is_none() && !self.help {
+            warn!("No search criteria specified, behavior may be undefined");
+        }
+        
+        Ok(())
     }
     
     /// Merge CLI arguments with a loaded configuration
@@ -184,21 +227,38 @@ impl Args {
             merged.file_name = loaded.file_name;
         }
         
-        // Only override if CLI didn't specify
+        // Thread count handling
+        if merged.thread_count.is_none() {
+            merged.thread_count = loaded.thread_count;
+        }
+        
+        // Traversal strategy handling
+        if merged.traversal_strategy.is_none() {
+            merged.traversal_strategy = loaded.traversal_strategy;
+        }
+        
+        // Boolean flag handling is more complex - only override if CLI didn't specify
         if self.quiet {
             merged.show_progress = false;
-        } else if !self.quiet {
-            // Keep the CLI setting
-        } else {
-            // Use the loaded setting
+        } else if !self.quiet && !self.silent {
+            // Keep the loaded setting
             merged.show_progress = loaded.show_progress;
         }
         
-        // Only override threads if CLI specified a value
-        if let Some(threads) = self.workers {
-            merged.thread_count = Some(threads);
+        // Handle recursive flag
+        if self.no_recursive {
+            merged.recursive = false;
         } else {
-            merged.thread_count = loaded.thread_count;
+            // Use the loaded setting
+            merged.recursive = loaded.recursive;
+        }
+        
+        // Follow symlinks flag
+        if self.follow_symlinks {
+            merged.follow_symlinks = true;
+        } else {
+            // Use the loaded setting
+            merged.follow_symlinks = loaded.follow_symlinks;
         }
         
         merged
@@ -206,9 +266,26 @@ impl Args {
     
     /// Save current configuration to a file
     pub fn save_config(&self, config: &FileSearchConfig) -> Result<()> {
-        if let Some(_save_path) = &self.save_config_file {
-            config.save_to_file(_save_path)?;
-            info!("Configuration saved to: {}", _save_path);
+        if let Some(save_path) = &self.save_config_file {
+            let path = Path::new(save_path);
+            
+            // Create parent directories if needed
+            if let Some(parent) = path.parent() {
+                if !parent.exists() {
+                    std::fs::create_dir_all(parent)
+                        .with_context(|| ArgsError::ConfigSaveError(
+                            format!("Failed to create directory: {}", parent.display())
+                        ))?;
+                }
+            }
+            
+            // Save the configuration
+            config.save_to_file(save_path)
+                .with_context(|| ArgsError::ConfigSaveError(
+                    format!("Failed to save configuration to: {}", save_path)
+                ))?;
+                
+            info!("Configuration saved to: {}", save_path);
         }
         
         Ok(())

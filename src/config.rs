@@ -1,7 +1,22 @@
 use std::fs;
+use std::path::Path;
+use thiserror::Error;
 use serde::{Deserialize, Serialize};
 use anyhow::{Context, Result};
 use crate::search::TraversalStrategy;
+
+/// Errors that can occur during configuration operations
+#[derive(Error, Debug)]
+pub enum ConfigError {
+    #[error("Failed to read config file: {0}")]
+    ReadError(String),
+    
+    #[error("Failed to parse config file: {0}")]
+    ParseError(String),
+    
+    #[error("Failed to write config file: {0}")]
+    WriteError(String),
+}
 
 /// Configuration for file search operations
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -51,30 +66,34 @@ impl FileSearchConfig {
     }
     
     /// Load configuration from a file
-    pub fn load_from_file(path: &str) -> Result<Self> {
-        let contents = fs::read_to_string(path)
-            .with_context(|| format!("Failed to read config file: {}", path))?;
+    pub fn load_from_file<P: AsRef<Path>>(path: P) -> Result<Self> {
+        let path_display = path.as_ref().display().to_string();
+        
+        let contents = fs::read_to_string(&path)
+            .with_context(|| ConfigError::ReadError(path_display.clone()))?;
             
         let config: Self = serde_json::from_str(&contents)
-            .with_context(|| format!("Failed to parse config file: {}", path))?;
+            .with_context(|| ConfigError::ParseError(path_display))?;
             
         Ok(config)
     }
     
     /// Save configuration to a file
-    pub fn save_to_file(&self, path: &str) -> Result<()> {
+    pub fn save_to_file<P: AsRef<Path>>(&self, path: P) -> Result<()> {
+        let path_display = path.as_ref().display().to_string();
+        
         let serialized = serde_json::to_string_pretty(self)
             .context("Failed to serialize configuration")?;
             
-        fs::write(path, serialized)
-            .with_context(|| format!("Failed to write config to file: {}", path))?;
+        fs::write(&path, serialized)
+            .with_context(|| ConfigError::WriteError(path_display))?;
             
         Ok(())
     }
     
-    /// Get the search path or a default
-    pub fn get_path(&self) -> String {
-        self.path.clone().unwrap_or_else(|| ".".to_string())
+    /// Get the search path or the default "." path
+    pub fn get_path(&self) -> &str {
+        self.path.as_deref().unwrap_or(".")
     }
 }
 

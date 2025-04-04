@@ -1,7 +1,7 @@
 use std::process;
 use anyhow::{Context, Result};
 use env_logger::Env;
-use log::error;
+use log::{error, info};
 
 use oqab::cli::args::Args;
 use oqab::config::FileSearchConfig;
@@ -18,7 +18,7 @@ fn main() {
     
     // Run the application and handle errors
     if let Err(err) = run() {
-        error!("Error: {}", err);
+        error!("Application error: {:#}", err);
         process::exit(1);
     }
     
@@ -27,18 +27,26 @@ fn main() {
 
 fn run() -> Result<()> {
     // Parse command line arguments using clap
-    let args = Args::parse().context("Failed to parse command line arguments")?;
+    let args = Args::parse()
+        .context("Failed to parse command line arguments")?;
     
     // Process arguments into a configuration
-    let config = args.process().context("Failed to process arguments")?;
+    let config = args.process()
+        .context("Failed to process arguments into a valid configuration")?;
     
     // Save configuration if requested
     if args.save_config_file.is_some() {
-        args.save_config(&config).context("Failed to save configuration")?;
+        args.save_config(&config)
+            .context("Failed to save configuration to file")?;
+        info!("Configuration saved successfully");
     }
     
     // Create and execute the appropriate command
-    create_command(&config)?.execute()
+    create_command(&config)?
+        .execute()
+        .context("Command execution failed")?;
+    
+    Ok(())
 }
 
 /// Create the appropriate command based on the configuration
@@ -51,9 +59,11 @@ fn create_command(config: &FileSearchConfig) -> Result<Box<dyn Command>> {
     // Create the appropriate command based on config
     if config.advanced_search {
         // Advanced search with observer
+        info!("Using advanced search mode");
         Ok(Box::new(AdvancedSearchCommand::new(config.clone())))
     } else {
         // Standard search
+        info!("Using standard search mode");
         Ok(Box::new(StandardSearchCommand::new(config.clone())))
     }
 }
