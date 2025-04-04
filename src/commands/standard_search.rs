@@ -1,5 +1,4 @@
 use anyhow::{Result, Context};
-use log::info;
 
 use crate::config::FileSearchConfig;
 use crate::commands::Command;

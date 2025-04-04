@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 use anyhow::{Result, Context, bail};
 use thiserror::Error;
-use log::{info, debug, warn};
+use log::{info, debug};
 use std::sync::Arc;
 
 use crate::config::FileSearchConfig;

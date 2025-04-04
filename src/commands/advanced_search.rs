@@ -1,6 +1,4 @@
-use std::path::{PathBuf, Path};
 use anyhow::{Result, Context};
-use log::info;
 
 use crate::commands::Command;
 use crate::config::FileSearchConfig;
