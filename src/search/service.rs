@@ -2,11 +2,9 @@ use std::path::{Path, PathBuf};
 use anyhow::{Result, Context, bail};
 use thiserror::Error;
 use log::{info, debug};
-use std::sync::Arc;
 
 use crate::config::FileSearchConfig;
 use crate::search::FinderFactory;
-use crate::ObserverRegistry;
 use crate::observers::ProgressReporter;
 
 /// Errors that can occur during search operations
@@ -63,6 +61,29 @@ impl SearchService {
         let search_path = Path::new(config.get_path());
         debug!("Executing standard search in path: {}", search_path.display());
         
+        // Create and execute the appropriate finder
+        self.create_and_execute_standard_finder(config, search_path)
+    }
+    
+    /// Execute an advanced search with observers based on the configuration
+    pub fn execute_advanced_search(&self, config: &FileSearchConfig) -> Result<Vec<PathBuf>> {
+        // Validate the configuration
+        self.validate_config(config)?;
+        
+        // Create progress reporter
+        let observer = ProgressReporter::new();
+        debug!("Created progress reporter for advanced search");
+        
+        // Get the search path
+        let search_path = PathBuf::from(config.get_path());
+        info!("Performing advanced search in directory: {}", search_path.display());
+        
+        // Create and execute finder with the observer
+        self.create_and_execute_advanced_finder(config, &search_path, observer)
+    }
+    
+    /// Create and execute the appropriate standard finder
+    fn create_and_execute_standard_finder(&self, config: &FileSearchConfig, search_path: &Path) -> Result<Vec<PathBuf>> {
         // Create finder using factory based on search criteria
         let finder = if let Some(name) = &config.file_name {
             if let Some(ext) = &config.file_extension {
@@ -90,58 +111,37 @@ impl SearchService {
             ))
     }
     
-    /// Execute an advanced search with observers based on the configuration
-    pub fn execute_advanced_search(&self, config: &FileSearchConfig) -> Result<Vec<PathBuf>> {
-        // Validate the configuration
-        self.validate_config(config)?;
+    /// Create and execute the appropriate advanced finder with observer
+    fn create_and_execute_advanced_finder(&self, config: &FileSearchConfig, search_path: &Path, observer: ProgressReporter) -> Result<Vec<PathBuf>> {
+        // Get the search criteria
+        let name = config.file_name.as_deref();
+        let extension = config.file_extension.as_deref();
         
-        // Create progress reporter
-        let observer = ProgressReporter::new();
-        debug!("Created progress reporter for advanced search");
+        // Create the finder with appropriate filters based on criteria
+        let finder = FinderFactory::create_finder_with_observer(
+            name, 
+            extension,
+            Box::new(observer)
+        );
         
-        // Get the search path
-        let search_path = PathBuf::from(config.get_path());
-        info!("Performing advanced search in directory: {}", search_path.display());
+        // Log what we're searching for
+        match (name, extension) {
+            (Some(n), Some(e)) => debug!("Searching for files with name '{}' and extension '{}'", n, e),
+            (Some(n), None) => debug!("Searching for files with name '{}'", n),
+            (None, Some(e)) => debug!("Searching for files with extension '{}'", e),
+            (None, None) => bail!(SearchError::NoCriteriaError), // This should be caught by validate_config
+        }
         
-        // Execute the appropriate finder based on search criteria
-        let finder_result = match &config.file_name {
-            Some(name) => {
-                // Create a name-based finder
-                if let Some(ext) = &config.file_extension {
-                    debug!("Searching for files with name '{}' and extension '{}'", name, ext);
-                    // Create advanced finder to handle both
-                    let ext_finder = crate::search::advanced::OqabFinderFactory::create_combined_finder(
-                        name, ext, Arc::new(ObserverRegistry::Progress(observer.clone()))
-                    );
-                    ext_finder.find(&search_path)
-                } else {
-                    debug!("Searching for files with name '{}'", name);
-                    // Just find files with the name pattern
-                    let name_finder = crate::search::advanced::OqabFinderFactory::create_name_filter_with_observer(
-                        name, Arc::new(ObserverRegistry::Progress(observer.clone()))
-                    );
-                    name_finder.find(&search_path)
-                }
-            },
-            None => {
-                // Just use extension filter
-                if let Some(ext) = &config.file_extension {
-                    debug!("Searching for files with extension '{}'", ext);
-                    let ext_finder = crate::search::advanced::OqabFinderFactory::create_extension_finder(ext);
-                    ext_finder.find(&search_path)
-                } else {
-                    // This case should be caught by validate_config
-                    bail!(SearchError::NoCriteriaError);
-                }
-            }
-        }.with_context(|| SearchError::ExecutionError(
-            format!("Failed to search in path: {}", search_path.display())
-        ))?;
+        // Execute search
+        let results = finder.find(search_path)
+            .with_context(|| SearchError::ExecutionError(
+                format!("Failed to search in path: {}", search_path.display())
+            ))?;
         
-        // Process results
-        info!("Search completed, found {} files", finder_result.len());
+        // Log results
+        info!("Search completed, found {} files", results.len());
         
-        Ok(finder_result)
+        Ok(results)
     }
     
     /// Format and display search results

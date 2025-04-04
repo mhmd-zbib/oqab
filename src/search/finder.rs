@@ -180,19 +180,37 @@ impl FinderFactory {
         FileFinder::new(Box::new(composite))
     }
     
-    /// Create a finder with an extension filter and observer (forwards to advanced finder)
-    pub fn create_extension_finder_with_observer(extension: &str, observer: Box<dyn SearchObserver>) -> crate::search::advanced::OqabFileFinder {
-        let registry = crate::search::advanced::OqabFinderFactory::create_observer_registry(Some(observer));
-        let finder = crate::search::advanced::OqabFileFinder::builder()
-            .with_extension_filter(ExtensionFilter::new(extension))
-            .with_observer(registry)
-            .build();
-        finder
-    }
-    
-    /// Create a finder with a name filter and observer (forwards to advanced finder)
-    pub fn create_name_finder_with_observer(name: &str, observer: Box<dyn SearchObserver>) -> crate::search::advanced::OqabFileFinder {
-        let registry = crate::search::advanced::OqabFinderFactory::create_observer_registry(Some(observer));
-        crate::search::advanced::OqabFinderFactory::create_name_filter_with_observer(name, registry)
+    /// Create a finder with an observer, applying the appropriate filter type
+    pub fn create_finder_with_observer(
+        name_pattern: Option<&str>, 
+        extension: Option<&str>, 
+        observer: Box<dyn SearchObserver>
+    ) -> crate::search::advanced::OqabFileFinder {
+        use crate::search::advanced::OqabFinderFactory;
+        
+        let registry = OqabFinderFactory::create_observer_registry(Some(observer));
+        
+        match (name_pattern, extension) {
+            (Some(name), Some(ext)) => {
+                // Both name and extension specified
+                OqabFinderFactory::create_combined_finder(name, ext, registry)
+            },
+            (Some(name), None) => {
+                // Name only
+                OqabFinderFactory::create_name_filter_with_observer(name, registry)
+            },
+            (None, Some(ext)) => {
+                // Extension only
+                let finder = crate::search::advanced::OqabFileFinder::builder()
+                    .with_extension_filter(ExtensionFilter::new(ext))
+                    .with_observer(registry)
+                    .build();
+                finder
+            },
+            (None, None) => {
+                // Neither specified - this should not happen
+                panic!("No search criteria provided to create_finder_with_observer")
+            }
+        }
     }
 } 

@@ -1,10 +1,8 @@
 mod help;
-mod standard_search;
-mod advanced_search;
+mod search;
 
 pub use help::HelpCommand;
-pub use standard_search::StandardSearchCommand;
-pub use advanced_search::AdvancedSearchCommand;
+pub use search::SearchCommand;
 
 use anyhow::Result;
 

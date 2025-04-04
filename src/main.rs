@@ -5,7 +5,7 @@ use log::{error, info};
 
 use oqab::cli::args::Args;
 use oqab::config::FileSearchConfig;
-use oqab::commands::{Command, HelpCommand, StandardSearchCommand, AdvancedSearchCommand};
+use oqab::commands::{Command, HelpCommand, SearchCommand};
 
 fn main() {
     // Initialize logger with custom environment
@@ -56,16 +56,11 @@ fn create_command(config: &FileSearchConfig) -> Result<Box<dyn Command>> {
         return Ok(Box::new(HelpCommand::new()));
     }
     
-    // Create the appropriate command based on config
-    if config.advanced_search {
-        // Advanced search with observer
-        info!("Using advanced search mode");
-        Ok(Box::new(AdvancedSearchCommand::new(config.clone())))
-    } else {
-        // Standard search
-        info!("Using standard search mode");
-        Ok(Box::new(StandardSearchCommand::new(config.clone())))
-    }
+    // Create search command
+    info!("Using {} search mode", 
+        if config.advanced_search { "advanced" } else { "standard" });
+    
+    Ok(Box::new(SearchCommand::new(config.clone())))
 }
 
 /// Display a welcome message
