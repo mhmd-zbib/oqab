@@ -7,7 +7,7 @@ use crate::{
         registry::ObserverRegistry,
         traversal::{DefaultTraversalStrategy, RegexTraversalStrategy, TraversalStrategy},
     },
-    filters::{ExtensionFilter, NameFilter, RegexFilter, SizeFilter},
+    filters::{ExtensionFilter, NameFilter, RegexFilter, SizeFilter, date::DateFilter},
 };
 
 /// Factory for creating pre-configured FileFinder instances
@@ -43,7 +43,30 @@ impl FinderFactory {
 
         // Add size filter if specified
         if let Some(size) = config.size {
-            builder = builder.with_filter("size", SizeFilter::new(size));
+            builder = builder.with_filter("size", SizeFilter::min(size));
+        } else {
+            // Add min size filter if specified
+            if let Some(min_size) = config.min_size {
+                builder = builder.with_filter("min_size", SizeFilter::min(min_size));
+            }
+            
+            // Add max size filter if specified
+            if let Some(max_size) = config.max_size {
+                builder = builder.with_filter("max_size", SizeFilter::max(max_size));
+            }
+        }
+        
+        // Add date filters if specified
+        if let Some(ref newer_than) = config.newer_than {
+            if let Ok(filter) = DateFilter::newer_than(newer_than) {
+                builder = builder.with_filter("newer_than", filter);
+            }
+        }
+        
+        if let Some(ref older_than) = config.older_than {
+            if let Ok(filter) = DateFilter::older_than(older_than) {
+                builder = builder.with_filter("older_than", filter);
+            }
         }
 
         // Set maximum depth if specified
@@ -93,7 +116,30 @@ impl FinderFactory {
 
         // Add size filter if specified
         if let Some(size) = config.size {
-            builder = builder.with_filter("size", SizeFilter::new(size));
+            builder = builder.with_filter("size", SizeFilter::min(size));
+        } else {
+            // Add min size filter if specified
+            if let Some(min_size) = config.min_size {
+                builder = builder.with_filter("min_size", SizeFilter::min(min_size));
+            }
+            
+            // Add max size filter if specified
+            if let Some(max_size) = config.max_size {
+                builder = builder.with_filter("max_size", SizeFilter::max(max_size));
+            }
+        }
+        
+        // Add date filters if specified
+        if let Some(ref newer_than) = config.newer_than {
+            if let Ok(filter) = DateFilter::newer_than(newer_than) {
+                builder = builder.with_filter("newer_than", filter);
+            }
+        }
+        
+        if let Some(ref older_than) = config.older_than {
+            if let Ok(filter) = DateFilter::older_than(older_than) {
+                builder = builder.with_filter("older_than", filter);
+            }
         }
 
         // Set maximum depth if specified

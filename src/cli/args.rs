@@ -5,6 +5,7 @@ use log::{info, warn, debug};
 use std::path::Path;
 use crate::core::traversal::TraversalMode;
 use crate::core::config::FileSearchConfig;
+use regex;
 
 /// Errors related to command-line argument processing
 #[derive(Error, Debug)]
@@ -81,6 +82,22 @@ pub struct Args {
     /// Follow symlinks
     #[arg(short = 'f', long = "follow-symlinks")]
     pub follow_symlinks: bool,
+    
+    /// Filter by minimum file size (e.g., "10kb", "5mb")
+    #[arg(long = "min-size")]
+    pub min_size: Option<String>,
+    
+    /// Filter by maximum file size (e.g., "10kb", "5mb")
+    #[arg(long = "max-size")]
+    pub max_size: Option<String>,
+    
+    /// Filter by modified after date (YYYY-MM-DD)
+    #[arg(long = "newer-than")]
+    pub newer_than: Option<String>,
+    
+    /// Filter by modified before date (YYYY-MM-DD)
+    #[arg(long = "older-than")]
+    pub older_than: Option<String>,
 }
 
 /// Available traversal strategies for directory searching
@@ -140,10 +157,56 @@ impl Args {
             config.traversal_mode = traversal_type.into();
         }
         
+        // Size filters
+        if let Some(min_size) = &self.min_size {
+            if let Ok(size) = Self::parse_size(min_size) {
+                config.min_size = Some(size);
+            }
+        }
+        
+        if let Some(max_size) = &self.max_size {
+            if let Ok(size) = Self::parse_size(max_size) {
+                config.max_size = Some(size);
+            }
+        }
+        
+        // Date filters
+        config.newer_than = self.newer_than.clone();
+        config.older_than = self.older_than.clone();
+        
         // Other settings
-        config.show_progress = !self.quiet;
+        config.show_progress = !self.quiet && !self.silent;
         config.recursive = !self.no_recursive;
         config.follow_symlinks = self.follow_symlinks;
+    }
+    
+    /// Parse a human-readable size string into bytes
+    fn parse_size(size_str: &str) -> Result<u64> {
+        let size_str = size_str.trim().to_lowercase();
+        
+        // Regular expression to match a number followed by an optional unit
+        let re = regex::Regex::new(r"^(\d+(?:\.\d+)?)\s*([kmgt]?b?)?$").unwrap();
+        
+        if let Some(caps) = re.captures(&size_str) {
+            let value: f64 = caps.get(1)
+                .map_or("0", |m| m.as_str())
+                .parse()
+                .unwrap_or(0.0);
+                
+            let unit = caps.get(2).map_or("", |m| m.as_str());
+            
+            let multiplier: u64 = match unit {
+                "k" | "kb" => 1_024,
+                "m" | "mb" => 1_024 * 1_024,
+                "g" | "gb" => 1_024 * 1_024 * 1_024,
+                "t" | "tb" => 1_099_511_627_776, // 1024^4
+                _ => 1, // Default to bytes
+            };
+            
+            Ok((value * multiplier as f64) as u64)
+        } else {
+            Err(ArgsError::InvalidValue(format!("Invalid size format: {}", size_str)).into())
+        }
     }
     
     /// Process command-line arguments, loading from config file if specified

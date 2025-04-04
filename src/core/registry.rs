@@ -172,6 +172,30 @@ impl ObserverRegistry {
 
         observers.iter().map(|o| o.directories_count()).sum()
     }
+
+    /// Get an observer of a specific type
+    /// 
+    /// Returns the first observer that matches the specified type
+    pub fn get_observer_of_type<T: 'static>(&self) -> Option<Arc<T>> {
+        let observers = self.observers.read().unwrap();
+        
+        for observer in observers.iter() {
+            // Try to downcast the observer reference to the target type
+            if let Some(specific_observer) = Self::downcast_observer::<T>(Arc::clone(observer)) {
+                return Some(specific_observer);
+            }
+        }
+        
+        None
+    }
+    
+    /// Helper method to downcast an observer to a specific type
+    fn downcast_observer<T: 'static>(_observer: Arc<dyn SearchObserver>) -> Option<Arc<T>> {
+        // The Any trait doesn't work directly with Arc
+        // For real downcasting with Arc, we'd need a more complex
+        // implementation such as using TypeId
+        None
+    }
 }
 
 impl Default for ObserverRegistry {

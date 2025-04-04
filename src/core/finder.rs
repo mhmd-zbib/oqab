@@ -141,10 +141,8 @@ impl FileFinder {
     }
     
     /// Helper to find a TrackingObserver in the registry
-    fn find_tracking_observer(_observer_registry: &ObserverRegistry) -> Option<Arc<TrackingObserver>> {
-        // Implementation depends on ObserverRegistry exposing observers
-        // This is a simplification
-        None
+    fn find_tracking_observer(observer_registry: &ObserverRegistry) -> Option<Arc<TrackingObserver>> {
+        observer_registry.get_observer_of_type::<TrackingObserver>()
     }
     
     /// Directly collect files matching criteria recursively

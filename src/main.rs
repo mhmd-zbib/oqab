@@ -3,13 +3,27 @@ use anyhow::{Context, Result};
 use env_logger::Env;
 use log::{error, info};
 
-use oqab::cli::args::Args;
 use oqab::core::config::FileSearchConfig;
 use oqab::commands::{Command, HelpCommand, SearchCommand};
 
 fn main() {
-    // Initialize logger with custom environment
-    env_logger::Builder::from_env(Env::default().default_filter_or("info"))
+    // Parse command line arguments
+    let args = match oqab::cli::args::Args::parse() {
+        Ok(args) => args,
+        Err(err) => {
+            eprintln!("Error parsing arguments: {}", err);
+            process::exit(1);
+        }
+    };
+    
+    // Initialize logger with custom environment based on verbosity flags
+    let log_level = if args.silent || args.quiet {
+        "warn".to_string()
+    } else {
+        std::env::var("RUST_LOG").unwrap_or_else(|_| "info".to_string())
+    };
+    
+    env_logger::Builder::from_env(Env::default().default_filter_or(&log_level))
         .format_timestamp(None)
         .init();
     
@@ -17,7 +31,7 @@ fn main() {
     display_banner();
     
     // Run the application and handle errors
-    if let Err(err) = run() {
+    if let Err(err) = run(&args) {
         error!("Application error: {:#}", err);
         process::exit(1);
     }
@@ -25,11 +39,7 @@ fn main() {
     process::exit(0);
 }
 
-fn run() -> Result<()> {
-    // Parse command line arguments using clap
-    let args = Args::parse()
-        .context("Failed to parse command line arguments")?;
-    
+fn run(args: &oqab::cli::args::Args) -> Result<()> {
     // Process arguments into a configuration
     let config = args.process()
         .context("Failed to process arguments into a valid configuration")?;

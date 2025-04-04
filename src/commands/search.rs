@@ -2,6 +2,7 @@ use anyhow::Result;
 use log::{info, debug};
 use std::sync::Arc;
 use std::path::PathBuf;
+use std::time::{Duration, Instant};
 
 use crate::commands::Command;
 use crate::core::FileSearchConfig;
@@ -12,6 +13,7 @@ use crate::utils::search_directory;
 /// Command for searching files
 pub struct SearchCommand<'a> {
     config: &'a FileSearchConfig,
+    start_time: Instant,
 }
 
 impl<'a> SearchCommand<'a> {
@@ -19,6 +21,7 @@ impl<'a> SearchCommand<'a> {
     pub fn new(config: &'a FileSearchConfig) -> Self {
         Self {
             config,
+            start_time: Instant::now(),
         }
     }
 
@@ -36,6 +39,18 @@ impl<'a> SearchCommand<'a> {
         app_config.name = self.config.file_name.clone();
         app_config.threads = self.config.thread_count;
         app_config.follow_links = Some(self.config.follow_symlinks);
+        app_config.show_progress = Some(self.config.show_progress);
+        
+        // Add size filters
+        app_config.min_size = self.config.min_size;
+        app_config.max_size = self.config.max_size;
+        
+        // Add date filters
+        app_config.newer_than = self.config.newer_than.clone();
+        app_config.older_than = self.config.older_than.clone();
+        
+        debug!("Size filters: min={:?}, max={:?}", app_config.min_size, app_config.max_size);
+        debug!("Date filters: newer={:?}, older={:?}", app_config.newer_than, app_config.older_than);
         
         app_config
     }
@@ -87,15 +102,42 @@ impl<'a> Command for SearchCommand<'a> {
 impl<'a> SearchCommand<'a> {
     /// Format and display search results
     fn display_results(&self, files: &[PathBuf]) -> Result<()> {
+        let elapsed = self.start_time.elapsed();
+        
         if !files.is_empty() {
             println!("\nFound {} matching file(s):", files.len());
             for file in files {
                 println!("  {}", file.display());
             }
+            
+            // Show performance metrics if not in silent mode
+            if self.config.show_progress {
+                self.display_performance_metrics(files.len(), elapsed);
+            }
         } else {
             println!("\nNo matching files found");
+            
+            // Even when no files are found, show how long the search took
+            if self.config.show_progress {
+                self.display_performance_metrics(0, elapsed);
+            }
         }
         
         Ok(())
+    }
+    
+    /// Display performance metrics
+    fn display_performance_metrics(&self, files_count: usize, elapsed: Duration) {
+        let elapsed_secs = elapsed.as_secs_f64();
+        let files_per_sec = if elapsed_secs > 0.0 && files_count > 0 {
+            files_count as f64 / elapsed_secs
+        } else {
+            0.0
+        };
+        
+        println!("\nPerformance:");
+        println!("  Time taken: {:.2} seconds", elapsed_secs);
+        println!("  Files found: {}", files_count);
+        println!("  Processing rate: {:.2} files/sec", files_per_sec);
     }
 } 

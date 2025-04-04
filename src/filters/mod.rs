@@ -26,14 +26,15 @@ pub enum FilterOperation {
     Or,
 }
 
-mod extension;
-mod name;
-mod regex;
-mod size;
-mod composite;
+pub mod name;
+pub mod extension;
+pub mod regex;
+pub mod size;
+pub mod composite;
+pub mod date;
 
-pub use extension::ExtensionFilter;
 pub use name::NameFilter;
+pub use extension::ExtensionFilter;
 pub use regex::RegexFilter;
 pub use size::SizeFilter;
 pub use composite::{CompositeFilter, TypedCompositeFilter}; 

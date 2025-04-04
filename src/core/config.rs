@@ -58,6 +58,22 @@ pub struct FileSearchConfig {
     /// Traversal strategy to use
     #[serde(default)]
     pub traversal_mode: TraversalMode,
+    
+    /// Minimum file size in bytes
+    #[serde(default)]
+    pub min_size: Option<u64>,
+    
+    /// Maximum file size in bytes
+    #[serde(default)]
+    pub max_size: Option<u64>,
+    
+    /// Modified after this date (ISO format: YYYY-MM-DD)
+    #[serde(default)]
+    pub newer_than: Option<String>,
+    
+    /// Modified before this date (ISO format: YYYY-MM-DD)
+    #[serde(default)]
+    pub older_than: Option<String>,
 }
 
 // Helper functions for serde defaults
@@ -77,6 +93,10 @@ impl FileSearchConfig {
             recursive: true,
             follow_symlinks: false,
             traversal_mode: TraversalMode::default(),
+            min_size: None,
+            max_size: None,
+            newer_than: None,
+            older_than: None,
         }
     }
     
@@ -133,7 +153,19 @@ pub struct AppConfig {
     /// Regular expression pattern to filter by
     pub pattern: Option<String>,
     
-    /// Minimum file size to filter by
+    /// Minimum file size in bytes
+    pub min_size: Option<u64>,
+    
+    /// Maximum file size in bytes
+    pub max_size: Option<u64>,
+    
+    /// Modified after this date (ISO format: YYYY-MM-DD)
+    pub newer_than: Option<String>,
+    
+    /// Modified before this date (ISO format: YYYY-MM-DD)
+    pub older_than: Option<String>,
+    
+    /// Size to filter by (legacy)
     pub size: Option<u64>,
     
     /// Maximum depth to search
@@ -144,6 +176,9 @@ pub struct AppConfig {
     
     /// Whether to follow symbolic links
     pub follow_links: Option<bool>,
+    
+    /// Whether to show progress during search
+    pub show_progress: Option<bool>,
 }
 
 impl Default for AppConfig {
@@ -153,10 +188,15 @@ impl Default for AppConfig {
             extension: None,
             name: None,
             pattern: None,
+            min_size: None,
+            max_size: None,
+            newer_than: None,
+            older_than: None,
             size: None,
             depth: None,
             threads: Some(num_cpus::get()),
             follow_links: Some(false),
+            show_progress: Some(true),
         }
     }
 } 
