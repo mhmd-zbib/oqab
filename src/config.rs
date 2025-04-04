@@ -22,32 +22,45 @@ pub enum ConfigError {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileSearchConfig {
     /// Path to search in (defaults to current directory)
+    #[serde(default)]
     pub path: Option<String>,
     
     /// File extension to filter by
+    #[serde(default)]
     pub file_extension: Option<String>,
     
     /// File name pattern to filter by
+    #[serde(default)]
     pub file_name: Option<String>,
     
     /// Whether to use advanced search features
+    #[serde(default)]
     pub advanced_search: bool,
     
     /// Number of threads to use for parallel search
+    #[serde(default)]
     pub thread_count: Option<usize>,
     
     /// Whether to show progress during search
+    #[serde(default = "default_show_progress")]
     pub show_progress: bool,
     
     /// Whether to search recursively in subdirectories
+    #[serde(default = "default_recursive")]
     pub recursive: bool,
     
     /// Whether to follow symbolic links
+    #[serde(default)]
     pub follow_symlinks: bool,
     
     /// Advanced options
+    #[serde(default)]
     pub traversal_strategy: Option<TraversalStrategy>,
 }
+
+// Helper functions for serde defaults
+fn default_show_progress() -> bool { true }
+fn default_recursive() -> bool { true }
 
 impl FileSearchConfig {
     /// Create a new configuration with default values
