@@ -1,6 +1,5 @@
 use anyhow::{Result, Context};
 use log::info;
-use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use crate::commands::Command;
@@ -14,9 +13,9 @@ pub struct SearchCommand<'a> {
     start_time: Instant,
 }
 
-impl SearchCommand<'_> {
+impl<'a> SearchCommand<'a> {
     /// Create a new search command
-    pub fn new(config: &FileSearchConfig) -> SearchCommand<'_> {
+    pub fn new(config: &'a FileSearchConfig) -> Self {
         Self {
             config,
             start_time: Instant::now(),
