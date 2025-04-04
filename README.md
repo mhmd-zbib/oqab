@@ -1,6 +1,30 @@
 # Oqab Search Utility
 
-A high-performance search utility written in Rust, designed for efficient content and file searching across complex directory structures.
+A high-performance search utility that makes finding information across multiple files as easy as an eagle spotting its prey. Whether you're searching through code, documents, or data files, Oqab (Arabic for "eagle") provides efficient content and file searching across complex directory structures.
+
+## Why Oqab?
+
+Born from the real-world need to search through large numbers of files in deeply nested directories, Oqab makes this task effortless. Whether you're searching for specific content across multiple files or looking for files with particular patterns, Oqab has got you covered.
+
+## Status: Work in Progress 🚧
+
+While the basic file finding functionality is implemented, we're actively working on these crucial features:
+
+### Coming Soon
+- **Enhanced Content Search**:
+  - Support for various file formats
+  - Pattern matching and regex support for content
+  - Results highlighting and export
+  
+- **Advanced Directory Processing**:
+  - Smart multi-processing for nested directories
+  - Intelligent workload distribution
+  - Progress tracking for deep directory structures
+  
+- **Performance Optimization**:
+  - Smart caching system for frequently accessed directories
+  - Cache invalidation strategies
+  - Memory-efficient file content scanning
 
 ## Overview
 
