@@ -38,6 +38,11 @@ impl Filter for SizeFilter {
             Err(_) => return FilterResult::Reject,
         };
         
+        // Directories are always accepted for traversal
+        if metadata.is_dir() {
+            return FilterResult::Accept;
+        }
+        
         // Get file size
         let file_size = metadata.len();
         
