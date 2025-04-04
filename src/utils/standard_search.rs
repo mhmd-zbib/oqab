@@ -1,21 +1,11 @@
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
 use std::time::Instant;
 use log::{debug, warn, info};
 use anyhow::{Context, Result};
 
 use crate::core::{
     config::FileSearchConfig,
-    observer::{SearchObserver, TrackingObserver},
-};
-use crate::filters::{
-    ExtensionFilter, 
-    Filter, 
-    FilterResult, 
-    NameFilter, 
-    SizeFilter,
-    date::DateFilter
+    observer::SearchObserver,
 };
 
 /// Search statistics for performance tracking
