@@ -169,7 +169,7 @@ impl FinderFactory {
     }
     
     /// Create a finder that filters by both name and extension
-    pub fn create_name_and_extension_finder(name_pattern: &str, extension: &str) -> FileFinder {
+    pub fn create_combined_finder(name_pattern: &str, extension: &str) -> FileFinder {
         use crate::search::composite::{CompositeFilter, FilterOperation};
         
         let name_filter = Box::new(NameFilter::new(name_pattern));
@@ -194,17 +194,5 @@ impl FinderFactory {
     pub fn create_name_finder_with_observer(name: &str, observer: Box<dyn SearchObserver>) -> crate::search::advanced::OqabFileFinder {
         let registry = crate::search::advanced::OqabFinderFactory::create_observer_registry(Some(observer));
         crate::search::advanced::OqabFinderFactory::create_name_filter_with_observer(name, registry)
-    }
-    
-    /// Create a finder with both extension and name filters
-    pub fn create_extension_and_name_finder(extension: &str, name: &str) -> FileFinder {
-        use crate::search::composite::{CompositeFilter, FilterOperation};
-        
-        let name_filter = Box::new(NameFilter::new(name));
-        let ext_filter = Box::new(ExtensionFilter::new(extension));
-        
-        let composite = CompositeFilter::new_with_filters(name_filter, ext_filter, FilterOperation::And);
-        
-        FileFinder::new(Box::new(composite))
     }
 } 

@@ -77,7 +77,7 @@ impl Command for StandardSearchCommand {
             if let Some(ext) = &self.config.file_extension {
                 // Find files with both name and extension
                 info!("Searching for files with name '{}' and extension '{}'", name, ext);
-                FinderFactory::create_name_and_extension_finder(name, ext)
+                FinderFactory::create_combined_finder(name, ext)
             } else {
                 // Find files with name only
                 info!("Searching for files with name '{}'", name);
