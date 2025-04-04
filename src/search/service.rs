@@ -30,7 +30,7 @@ impl SearchService {
     }
     
     /// Validate the search configuration
-    pub fn validate_config(&self, config: &FileSearchConfig) -> Result<()> {
+    pub fn validate_config<'a>(&self, config: &'a FileSearchConfig) -> Result<()> {
         // Check that at least one search criteria is provided
         if config.file_name.is_none() && config.file_extension.is_none() {
             return Err(SearchError::NoCriteriaError.into());
@@ -53,7 +53,7 @@ impl SearchService {
     }
     
     /// Execute a standard search based on the configuration
-    pub fn execute_standard_search(&self, config: &FileSearchConfig) -> Result<Vec<PathBuf>> {
+    pub fn execute_standard_search<'a>(&self, config: &'a FileSearchConfig) -> Result<Vec<PathBuf>> {
         // Validate the configuration
         self.validate_config(config)?;
         
@@ -66,7 +66,7 @@ impl SearchService {
     }
     
     /// Execute an advanced search with observers based on the configuration
-    pub fn execute_advanced_search(&self, config: &FileSearchConfig) -> Result<Vec<PathBuf>> {
+    pub fn execute_advanced_search<'a>(&self, config: &'a FileSearchConfig) -> Result<Vec<PathBuf>> {
         // Validate the configuration
         self.validate_config(config)?;
         
@@ -75,15 +75,15 @@ impl SearchService {
         debug!("Created progress reporter for advanced search");
         
         // Get the search path
-        let search_path = PathBuf::from(config.get_path());
+        let search_path = Path::new(config.get_path());
         info!("Performing advanced search in directory: {}", search_path.display());
         
         // Create and execute finder with the observer
-        self.create_and_execute_advanced_finder(config, &search_path, observer)
+        self.create_and_execute_advanced_finder(config, search_path, observer)
     }
     
     /// Create and execute the appropriate standard finder
-    fn create_and_execute_standard_finder(&self, config: &FileSearchConfig, search_path: &Path) -> Result<Vec<PathBuf>> {
+    fn create_and_execute_standard_finder<'a>(&self, config: &'a FileSearchConfig, search_path: &Path) -> Result<Vec<PathBuf>> {
         // Create finder using factory based on search criteria
         let finder = if let Some(name) = &config.file_name {
             if let Some(ext) = &config.file_extension {
@@ -112,7 +112,7 @@ impl SearchService {
     }
     
     /// Create and execute the appropriate advanced finder with observer
-    fn create_and_execute_advanced_finder(&self, config: &FileSearchConfig, search_path: &Path, observer: ProgressReporter) -> Result<Vec<PathBuf>> {
+    fn create_and_execute_advanced_finder<'a>(&self, config: &'a FileSearchConfig, search_path: &Path, observer: ProgressReporter) -> Result<Vec<PathBuf>> {
         // Get the search criteria
         let name = config.file_name.as_deref();
         let extension = config.file_extension.as_deref();
