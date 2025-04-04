@@ -145,7 +145,7 @@ impl FileFinder {
                     let observers = Arc::clone(&observers);
                     
                     move |file_path| {
-                        if let FilterResult::Accept = filters.apply_all(&file_path) {
+                        if filters.apply_all(&file_path) == FilterResult::Accept {
                             observers.notify_file_found(&file_path);
                         }
                     }
@@ -187,9 +187,9 @@ impl FileFinder {
             if let Err(e) = Self::collect_files_direct(
                 root_dir, 
                 &*traversal, 
-                &*filters, 
+                &filters, 
                 &mut results, 
-                self.config.max_depth.unwrap_or(std::usize::MAX),
+                self.config.max_depth.unwrap_or(usize::MAX),
                 0
             ) {
                 warn!("Error during direct file collection: {}", e);
@@ -250,10 +250,8 @@ impl FileFinder {
                 ) {
                     warn!("Error collecting files in subdirectory {}: {}", path.display(), e);
                 }
-            } else if file_type.is_file() && traversal.should_process_file(&path) {
-                if FilterResult::Accept == filters.apply_all(&path) {
-                    results.push(path);
-                }
+            } else if file_type.is_file() && traversal.should_process_file(&path) && filters.apply_all(&path) == FilterResult::Accept {
+                results.push(path);
             }
         }
         
@@ -332,11 +330,8 @@ fn process_directory(
                 current_depth.pop();
             }
         } else if file_type.is_file() && traversal_strategy.should_process_file(&path) {
-            match filter_registry.apply_all(&path) {
-                FilterResult::Accept => {
-                    observer_registry.notify_file_found(&path);
-                }
-                _ => {}
+            if filter_registry.apply_all(&path) == FilterResult::Accept {
+                observer_registry.notify_file_found(&path);
             }
         } else if file_type.is_symlink() && config.follow_links {
             // Follow symlinks if enabled
@@ -373,11 +368,8 @@ fn process_directory(
                                 }
                             } else if metadata.is_file() && traversal_strategy.should_process_file(&target_path) {
                                 // Process the file the symlink points to
-                                match filter_registry.apply_all(&target_path) {
-                                    FilterResult::Accept => {
-                                        observer_registry.notify_file_found(&target_path);
-                                    }
-                                    _ => {}
+                                if filter_registry.apply_all(&target_path) == FilterResult::Accept {
+                                    observer_registry.notify_file_found(&target_path);
                                 }
                             }
                         }
