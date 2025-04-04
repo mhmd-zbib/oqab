@@ -1,151 +1,191 @@
 # Oqab File Finder
 
-A high-performance, feature-rich file finding utility built in Rust.
+A high-performance file discovery utility written in Rust, designed for efficient searching and filtering of files across complex directory structures.
 
-## Features
+## Overview
 
-- Fast and efficient file searching
-- Multiple search modes (standard and advanced)
-- Search by file extension or name pattern
-- Parallel processing for improved performance
-- Progress reporting and silent mode
-- Configuration file support
-- Comprehensive error handling
+Oqab (Arabic for "eagle") is a command-line utility that provides advanced file searching capabilities with a focus on performance, flexibility, and usability. It allows users to quickly locate files based on various criteria including extension, name pattern, file size, and modification date.
+
+## Key Features
+
+- **Multi-threaded Processing**: Leverages parallel execution for significantly faster file system traversal
+- **Dual Search Modes**:
+  - Standard search for common use cases
+  - Advanced search with optimized worker pools for handling large file systems
+- **Comprehensive Filtering**:
+  - Extension-based filtering
+  - Name pattern matching
+  - Size constraints (minimum/maximum)
+  - Date-based filtering (newer than/older than)
+- **Flexible Configuration**:
+  - Command-line interface for direct usage
+  - JSON configuration files for reusable search profiles
+- **Performance Metrics**: Detailed statistics about search operations
+- **Robust Error Handling**: Comprehensive error detection and reporting
+- **Symlink Support**: Option to follow or ignore symbolic links
 
 ## Installation
 
-### From Source
+### Prerequisites
 
-1. Clone the repository
+- Rust toolchain (1.56.0 or newer)
+- Cargo package manager
+
+### Building from Source
+
 ```bash
-git clone https://github.com/yourusername/oqab.git
+# Clone the repository
+git clone https://github.com/username/oqab.git
 cd oqab
-```
 
-2. Build with Cargo
-```bash
+# Build the project
 cargo build --release
+
+# The binary will be available at target/release/oqab
 ```
 
-3. The binary will be available in `target/release/oqab`
-
-## Usage
+## Usage Examples
 
 ### Basic Usage
 
-Find all `.rs` files in the current directory:
+Find all Rust source files in the current directory:
 ```bash
-oqab -e .rs
+oqab --ext rs
 ```
 
-Find files with "config" in their name:
+Search for files in a specific directory:
 ```bash
-oqab -n config
+oqab --path /path/to/search --ext txt
 ```
 
-Search in a specific directory:
+Find files matching a specific name pattern:
 ```bash
-oqab -p /path/to/search -e .txt
+oqab --path . --name config
 ```
 
-Combine extension and name filters:
+### Advanced Filtering
+
+Find large files (> 1MB):
 ```bash
-oqab -e .js -n test
+oqab --path . --min-size 1MB
 ```
 
-### Command Line Options
-
-```
-Options:
-  -h, --help                Display help information
-  -p, --path <PATH>         Directory to search (default: current directory)
-  -e, --ext <EXTENSION>     File extension to search for
-  -n, --name <NAME>         File name pattern to search for
-  -a, --advanced            Use advanced search algorithm
-  -s, --silent              Suppress progress output
-  -w, --workers <NUMBER>    Number of worker threads (default: number of CPU cores)
-  -c, --config <FILE>       Load configuration from file
-  --save-config <FILE>      Save current configuration to file
+Find recently modified files:
+```bash
+oqab --path . --newer-than 2023-01-01
 ```
 
-### Configuration Files
-
-You can save and load search configurations using JSON files:
-
-```
-# Save search settings to a config file
-oqab -p . -e rs --save-config myconfig.json
-
-# Use settings from a config file
-oqab -c myconfig.json
-
-# Load settings but override some options
-oqab -c myconfig.json -p /different/path
+Combined filters (Rust files with "test" in the name):
+```bash
+oqab --path . --ext rs --name test
 ```
 
-#### Configuration File Format
+### Performance Options
 
-Configuration files use JSON format. Here's an example:
+Use advanced search algorithm for better performance:
+```bash
+oqab --path . --ext log --advanced
+```
 
+Specify number of worker threads:
+```bash
+oqab --path . --ext rs --workers 8
+```
+
+Run in silent mode (no progress output):
+```bash
+oqab --path . --ext rs --silent
+```
+
+## Command Line Reference
+
+```
+USAGE:
+oqab [OPTIONS]
+
+OPTIONS:
+  -h, --help                   Display this help message
+  -p, --path <DIR>             Directory to search in
+  -e, --ext <EXT>              File extension to search for (e.g., 'rs' or '.rs')
+  -n, --name <PATTERN>         Filter by file name pattern
+  --min-size <SIZE>            Minimum file size (e.g., '10kb', '1MB')
+  --max-size <SIZE>            Maximum file size
+  --newer-than <DATE>          Files newer than specified date (YYYY-MM-DD)
+  --older-than <DATE>          Files older than specified date (YYYY-MM-DD)
+  -a, --advanced               Use advanced search algorithm with better performance
+  -s, --silent                 Suppress progress output
+  -w, --workers <NUM>          Number of worker threads (default: CPU cores)
+  -r, --recursive              Search recursively in subdirectories
+  --follow-links               Follow symbolic links
+  -c, --config <FILE>          Load settings from a configuration file
+  --save-config <FILE>         Save current settings to a configuration file
+```
+
+## Configuration Files
+
+Oqab supports JSON configuration files for storing and reusing search settings.
+
+Example configuration file:
 ```json
 {
-  "path": "src",
+  "path": "/home/user/projects",
   "file_extension": "rs",
-  "file_name": "mod",
-  "advanced_search": false,
+  "file_name": "test",
+  "advanced_search": true,
   "thread_count": 4,
   "show_progress": true,
   "recursive": true,
   "follow_symlinks": false,
-  "traversal_strategy": null
+  "min_size": 1024,
+  "max_size": null,
+  "newer_than": "2023-01-01",
+  "older_than": null
 }
 ```
 
-Available configuration options:
+## Architecture
 
-| Option | Type | Description |
-|--------|------|-------------|
-| path | String | Directory to search in |
-| file_extension | String | File extension to filter by (without the dot) |
-| file_name | String | File name pattern to filter by |
-| advanced_search | Boolean | Whether to use the advanced search algorithm |
-| thread_count | Integer | Number of worker threads for parallel processing |
-| show_progress | Boolean | Whether to display progress during search |
-| recursive | Boolean | Whether to search subdirectories |
-| follow_symlinks | Boolean | Whether to follow symbolic links |
-| traversal_strategy | String | Directory traversal strategy ("BreadthFirst" or "DepthFirst") |
+Oqab is built with a focus on maintainable and efficient code using several design patterns:
 
-### Benchmarking
+- **Observer Pattern**: For tracking and reporting search progress
+- **Strategy Pattern**: For interchangeable search and traversal algorithms
+- **Factory Pattern**: For creating appropriate searchers based on configuration
+- **Builder Pattern**: For constructing complex search configurations
+- **Filter Chain**: For combining multiple file filters
 
-Oqab includes benchmarks to measure and compare the performance of different search implementations:
+## Performance
 
-Run all benchmarks:
+The application includes two search modes:
+
+1. **Standard Search**: Efficient for most use cases and smaller directory structures
+2. **Advanced Search**: Uses a worker pool with optimized thread management for handling very large directory structures (100,000+ files)
+
+Performance metrics are displayed after each search operation, showing:
+- Time taken
+- Files processed
+- Directories traversed
+- Processing rate (files/second)
+
+## Testing
+
+Comprehensive test suite covering:
+- Unit tests for individual components
+- Integration tests for search functionality
+- Performance benchmarks
+
+Run the tests with:
 ```bash
+# Run all tests
+cargo test
+
+# Run benchmarks
 cargo bench
 ```
 
-This will run performance tests for both the standard file finder and the advanced hyper file finder, allowing you to compare their relative performance.
-
-## Architecture
-
-Oqab is built with a focus on maintainability, extensibility, and performance:
-
-- **Command Pattern**: Different search implementations are encapsulated in command objects
-- **Strategy Pattern**: Interchangeable filtering strategies
-- **Composite Pattern**: Allows combining multiple filters
-- **Builder Pattern**: Fluent API for constructing complex objects
-- **Observer Pattern**: Progress reporting during search operations
-
 ## License
 
-MIT License
+This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request 
+Contributions are welcome! Please feel free to submit a pull request or open an issue to discuss potential improvements or report bugs. 
