@@ -3,7 +3,7 @@ use std::{
     collections::HashMap,
     fmt,
     path::Path,
-    sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
+    sync::{Arc, RwLock, RwLockReadGuard},
 };
 
 use anyhow::Result;
