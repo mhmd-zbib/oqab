@@ -1,12 +1,12 @@
-use anyhow::Result;
+use anyhow::{Result, Context};
 use log::{info, debug};
 use std::sync::Arc;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use crate::commands::Command;
-use crate::core::FileSearchConfig;
-use crate::core::observer::{TrackingObserver, SearchObserver};
+use crate::core::{FileSearchConfig, FinderFactory};
+use crate::core::observer::{SearchObserver, SilentObserver, TrackingObserver};
 use crate::core::registry::ObserverRegistry;
 use crate::utils::search_directory;
 
@@ -26,33 +26,28 @@ impl<'a> SearchCommand<'a> {
     }
 
     /// Convert FileSearchConfig to AppConfig
-    fn create_app_config(&self) -> crate::core::AppConfig {
-        let mut app_config = crate::core::AppConfig::default();
+    fn create_app_config(&self) -> Result<crate::core::config::AppConfig> {
+        // Build app config based on file search config
+        let app_config = crate::core::config::AppConfig {
+            root_dir: match &self.config.path {
+                Some(path) => std::path::PathBuf::from(path),
+                None => std::env::current_dir()?,
+            },
+            extension: self.config.file_extension.clone(),
+            name: self.config.file_name.clone(),
+            pattern: None,
+            min_size: self.config.min_size,
+            max_size: self.config.max_size,
+            newer_than: self.config.newer_than.clone(),
+            older_than: self.config.older_than.clone(),
+            size: None,
+            depth: None,
+            threads: self.config.thread_count,
+            follow_links: Some(self.config.follow_symlinks),
+            show_progress: Some(self.config.show_progress),
+        };
         
-        app_config.root_dir = std::path::PathBuf::from(self.config.get_path());
-        
-        debug!("Search path: {:?}", app_config.root_dir);
-        debug!("Extension: {:?}", self.config.file_extension);
-        debug!("Name: {:?}", self.config.file_name);
-        
-        app_config.extension = self.config.file_extension.clone();
-        app_config.name = self.config.file_name.clone();
-        app_config.threads = self.config.thread_count;
-        app_config.follow_links = Some(self.config.follow_symlinks);
-        app_config.show_progress = Some(self.config.show_progress);
-        
-        // Add size filters
-        app_config.min_size = self.config.min_size;
-        app_config.max_size = self.config.max_size;
-        
-        // Add date filters
-        app_config.newer_than = self.config.newer_than.clone();
-        app_config.older_than = self.config.older_than.clone();
-        
-        debug!("Size filters: min={:?}, max={:?}", app_config.min_size, app_config.max_size);
-        debug!("Date filters: newer={:?}, older={:?}", app_config.newer_than, app_config.older_than);
-        
-        app_config
+        Ok(app_config)
     }
     
     /// Get a configured observer registry with tracking
@@ -68,40 +63,66 @@ impl<'a> SearchCommand<'a> {
 }
 
 impl<'a> Command for SearchCommand<'a> {
+    /// Execute the search command
     fn execute(&self) -> Result<()> {
-        // Convert to app config
-        let app_config = self.create_app_config();
+        let app_config = self.create_app_config()?;
         
-        // Create observer with tracking - currently unused but kept for future implementation
-        let (_observer_registry, _tracker) = self.create_observer_registry();
+        // Create appropriate observer based on configuration
+        let observer: Box<dyn SearchObserver> = if self.config.show_progress {
+            Box::new(TrackingObserver::new())
+        } else {
+            Box::new(SilentObserver::new())
+        };
         
-        debug!("Created observer registry");
-        
-        // Execute the appropriate search based on configuration
-        let results = if self.config.advanced_search {
-            // Use the advanced finder
+        // Execute the appropriate search function based on configuration
+        if self.config.advanced_search {
             info!("Using advanced search mode");
             
-            // For now, just use the standard search for both modes
-            // In a real implementation, we'd use the advanced finder
-            debug!("Using standard search implementation for advanced mode");
-            search_directory(&app_config.root_dir, &app_config)
+            // Create a finder from the factory with the appropriate config
+            let finder = FinderFactory::create_standard_finder(&app_config);
+            
+            // The finder adds its own tracking observer internally
+            let results = finder.find(&app_config.root_dir)
+                .with_context(|| format!("Advanced search failed in: {}", app_config.root_dir.display()))?;
+                
+            self.display_results(&results)?;
         } else {
-            // Use the standard search
             info!("Using standard search mode");
-            search_directory(&app_config.root_dir, &app_config)
-        };
             
-        // Display the results
-        self.display_results(&results)?;
+            // Convert AppConfig to FileSearchConfig for the standard search
+            let search_config = FileSearchConfig {
+                path: Some(app_config.root_dir.to_string_lossy().to_string()),
+                file_extension: app_config.extension.clone(),
+                file_name: app_config.name.clone(),
+                advanced_search: false,
+                thread_count: app_config.threads,
+                show_progress: app_config.show_progress.unwrap_or(true),
+                recursive: true, // Default to recursive
+                follow_symlinks: app_config.follow_links.unwrap_or(false),
+                traversal_mode: Default::default(),
+                min_size: app_config.min_size,
+                max_size: app_config.max_size,
+                newer_than: app_config.newer_than.clone(),
+                older_than: app_config.older_than.clone(),
+            };
             
+            // Use the standard search utility
+            let results = search_directory(
+                &app_config.root_dir, 
+                &search_config,
+                &*observer
+            ).with_context(|| format!("Standard search failed in: {}", app_config.root_dir.display()))?;
+            
+            self.display_results(&results)?;
+        }
+        
         Ok(())
     }
 }
 
 impl<'a> SearchCommand<'a> {
-    /// Format and display search results
-    fn display_results(&self, files: &[PathBuf]) -> Result<()> {
+    /// Display the search results
+    fn display_results(&self, files: &[std::path::PathBuf]) -> Result<()> {
         let elapsed = self.start_time.elapsed();
         
         if !files.is_empty() {

@@ -1,9 +1,13 @@
 use std::{
+    any::TypeId,
     collections::HashMap,
     fmt,
     path::Path,
-    sync::{Arc, RwLock},
+    sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
+
+use anyhow::{Context, Result};
+use log::{debug, warn};
 
 use crate::{
     core::observer::{NullObserver, SearchObserver},
@@ -77,7 +81,10 @@ impl fmt::Debug for ObserverRegistry {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let observers = match self.observers.read() {
             Ok(guard) => guard.len(),
-            Err(_) => 0,
+            Err(_) => {
+                warn!("Failed to acquire read lock for ObserverRegistry debug");
+                0
+            }
         };
         
         f.debug_struct("ObserverRegistry")
@@ -97,7 +104,11 @@ impl Clone for ObserverRegistry {
                 for observer in observers.iter() {
                     new_observers.push(Arc::clone(observer));
                 }
+            } else {
+                warn!("Failed to acquire write lock when cloning ObserverRegistry");
             }
+        } else {
+            warn!("Failed to acquire read lock when cloning ObserverRegistry");
         }
         
         new_registry
@@ -117,21 +128,46 @@ impl ObserverRegistry {
     where
         O: SearchObserver + 'static,
     {
-        let mut observers = self.observers.write().unwrap();
-        observers.push(Arc::new(observer));
+        if let Ok(mut observers) = self.observers.write() {
+            observers.push(Arc::new(observer));
+        } else {
+            warn!("Failed to register observer: could not acquire write lock");
+        }
         self
     }
 
     /// Register an already Arc-wrapped observer
     pub fn register_arc(&self, observer: Arc<dyn SearchObserver>) -> &Self {
-        let mut observers = self.observers.write().unwrap();
-        observers.push(observer);
+        if let Ok(mut observers) = self.observers.write() {
+            observers.push(observer);
+        } else {
+            warn!("Failed to register Arc observer: could not acquire write lock");
+        }
         self
+    }
+
+    // Helper method to safely acquire read lock
+    fn read_observers(&self) -> Result<RwLockReadGuard<'_, Vec<Arc<dyn SearchObserver>>>> {
+        self.observers.read()
+            .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: poisoned lock"))
+    }
+
+    // Helper method to safely acquire write lock
+    fn write_observers(&self) -> Result<RwLockWriteGuard<'_, Vec<Arc<dyn SearchObserver>>>> {
+        self.observers.write()
+            .map_err(|e| anyhow::anyhow!("Failed to acquire write lock: poisoned lock"))
     }
 
     /// Notify all observers that a file was found
     pub fn notify_file_found(&self, path: &Path) {
-        let observers = self.observers.read().unwrap();
+        let observers = match self.read_observers() {
+            Ok(obs) => obs,
+            Err(e) => {
+                warn!("Failed to notify observers of file found: {}", e);
+                return;
+            }
+        };
+        
         if observers.is_empty() {
             return;
         }
@@ -143,7 +179,14 @@ impl ObserverRegistry {
 
     /// Notify all observers that a directory was processed
     pub fn notify_directory_processed(&self, path: &Path) {
-        let observers = self.observers.read().unwrap();
+        let observers = match self.read_observers() {
+            Ok(obs) => obs,
+            Err(e) => {
+                warn!("Failed to notify observers of directory processed: {}", e);
+                return;
+            }
+        };
+        
         if observers.is_empty() {
             return;
         }
@@ -155,7 +198,14 @@ impl ObserverRegistry {
 
     /// Get total file count from all observers
     pub fn files_count(&self) -> usize {
-        let observers = self.observers.read().unwrap();
+        let observers = match self.read_observers() {
+            Ok(obs) => obs,
+            Err(e) => {
+                warn!("Failed to get file count: {}", e);
+                return 0;
+            }
+        };
+        
         if observers.is_empty() {
             return 0;
         }
@@ -165,7 +215,14 @@ impl ObserverRegistry {
 
     /// Get total directory count from all observers
     pub fn directories_count(&self) -> usize {
-        let observers = self.observers.read().unwrap();
+        let observers = match self.read_observers() {
+            Ok(obs) => obs,
+            Err(e) => {
+                warn!("Failed to get directory count: {}", e);
+                return 0;
+            }
+        };
+        
         if observers.is_empty() {
             return 0;
         }
@@ -177,7 +234,13 @@ impl ObserverRegistry {
     /// 
     /// Returns the first observer that matches the specified type
     pub fn get_observer_of_type<T: 'static>(&self) -> Option<Arc<T>> {
-        let observers = self.observers.read().unwrap();
+        let observers = match self.read_observers() {
+            Ok(obs) => obs,
+            Err(e) => {
+                warn!("Failed to get observer of type: {}", e);
+                return None;
+            }
+        };
         
         for observer in observers.iter() {
             // Try to downcast the observer reference to the target type
@@ -190,11 +253,40 @@ impl ObserverRegistry {
     }
     
     /// Helper method to downcast an observer to a specific type
-    fn downcast_observer<T: 'static>(_observer: Arc<dyn SearchObserver>) -> Option<Arc<T>> {
-        // The Any trait doesn't work directly with Arc
-        // For real downcasting with Arc, we'd need a more complex
-        // implementation such as using TypeId
-        None
+    /// Uses the TypeId to check if the underlying type matches the target type
+    fn downcast_observer<T: 'static>(observer: Arc<dyn SearchObserver>) -> Option<Arc<T>> {
+        // Use std::any::TypeId to compare types
+        let target_type_id = TypeId::of::<T>();
+        
+        // Get the type_id of the underlying concrete type by using as_any
+        let observer_type_id = observer.as_any().type_id();
+        let is_matching_type = observer_type_id == target_type_id;
+        
+        if is_matching_type {
+            // This is where we use Arc::into_raw and from_raw to perform
+            // the cast safely, required with Arc
+            unsafe {
+                // Convert Arc<dyn SearchObserver> to *const dyn SearchObserver
+                let ptr = Arc::into_raw(observer);
+                
+                // Cast to *const T
+                let typed_ptr = ptr as *const T;
+                
+                // Convert back to Arc<T>
+                let typed_arc = Arc::from_raw(typed_ptr);
+                
+                // Create a clone to avoid dropping the original Arc when this function returns
+                let result = Arc::clone(&typed_arc);
+                
+                // Convert typed_arc back to raw and then back to original type
+                // to avoid dropping the original allocation
+                let _ = Arc::into_raw(typed_arc);
+                
+                Some(result)
+            }
+        } else {
+            None
+        }
     }
 }
 

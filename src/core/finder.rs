@@ -1,7 +1,11 @@
 use std::{
     path::{Path, PathBuf},
     sync::Arc,
+    io,
 };
+
+use log::{debug, error, warn};
+use anyhow::{Context, Result};
 
 use crate::{
     core::{
@@ -12,6 +16,19 @@ use crate::{
     },
     filters::FilterResult,
 };
+
+/// Error types specific to file finding operations
+#[derive(Debug, thiserror::Error)]
+pub enum FinderError {
+    #[error("Directory access error: {0}")]
+    DirectoryAccess(#[from] io::Error),
+    
+    #[error("Invalid path: {0}")]
+    InvalidPath(String),
+    
+    #[error("Worker pool error: {0}")]
+    WorkerPool(String),
+}
 
 /// Configuration for file finder
 #[derive(Debug, Clone)]
@@ -59,28 +76,44 @@ impl FileFinder {
     }
 
     /// Find files in the given directory
-    pub fn find(&self, root_dir: &Path) -> Vec<PathBuf> {
+    pub fn find(&self, root_dir: &Path) -> Result<Vec<PathBuf>> {
         let traversal = Arc::clone(&self.traversal_strategy);
         let filters = Arc::clone(&self.filter_registry);
         let observers = Arc::clone(&self.observer_registry);
         
         // Check if the root directory exists
-        if !root_dir.exists() || !root_dir.is_dir() {
-            return Vec::new();
+        if !root_dir.exists() {
+            return Err(FinderError::InvalidPath(format!(
+                "Root directory does not exist: {}", 
+                root_dir.display()
+            )).into());
         }
+        
+        if !root_dir.is_dir() {
+            return Err(FinderError::InvalidPath(format!(
+                "Path is not a directory: {}", 
+                root_dir.display()
+            )).into());
+        }
+        
+        debug!("Starting search in directory: {}", root_dir.display());
         
         // For simple cases, process directly without worker pool
         if self.config.num_threads <= 1 {
+            debug!("Using single-threaded mode");
             let mut current_depth = Vec::new();
-            process_directory(
+            if let Err(e) = process_directory(
                 root_dir,
                 &traversal,
                 &filters,
                 &observers,
                 &self.config,
                 &mut current_depth,
-            );
+            ) {
+                warn!("Error processing root directory: {}", e);
+            }
         } else {
+            debug!("Using multi-threaded mode with {} threads", self.config.num_threads);
             let worker_pool = WorkerPool::new(
                 self.config.num_threads,
                 
@@ -92,14 +125,17 @@ impl FileFinder {
                     let config = self.config.clone();
                     
                     move |dir_path| {
-                        process_directory(
+                        let mut current_depth = Vec::new();
+                        if let Err(e) = process_directory(
                             &dir_path,
                             &traversal,
                             &filters,
                             &observers,
                             &config,
-                            &mut Vec::new(),
-                        );
+                            &mut current_depth,
+                        ) {
+                            error!("Error processing directory {}: {}", dir_path.display(), e);
+                        }
                     }
                 },
                 
@@ -117,26 +153,49 @@ impl FileFinder {
             );
             
             // Process the root directory
-            worker_pool.submit_directory(root_dir);
+            if !worker_pool.submit_directory(root_dir) {
+                warn!("Failed to submit root directory to worker pool: {}", root_dir.display());
+            }
             worker_pool.complete();
+            worker_pool.join();
         }
         
         // If we have a TrackingObserver in the registry, we can try to get the results from it
-        // For now, this is a simplification - in a real app we'd want a more robust way to get results
         if let Some(tracking_observer) = Self::find_tracking_observer(&observers) {
-            tracking_observer.get_found_files()
+            match tracking_observer.lock_found_files() {
+                Ok(files_guard) => {
+                    // Create a new vector with the file paths
+                    let mut result = Vec::with_capacity(files_guard.len());
+                    for path in files_guard.iter() {
+                        result.push(path.clone());
+                    }
+                    debug!("Search completed. Found {} matching files", result.len());
+                    Ok(result)
+                },
+                Err(e) => {
+                    warn!("Failed to lock found files, falling back to deprecated method: {}", e);
+                    #[allow(deprecated)]
+                    let files = tracking_observer.get_found_files();
+                    debug!("Search completed with fallback. Found {} matching files", files.len());
+                    Ok(files)
+                }
+            }
         } else {
+            debug!("No tracking observer found in registry, falling back to direct collection");
             // Fallback: do a simple direct search
             let mut results = Vec::new();
-            Self::collect_files_direct(
+            if let Err(e) = Self::collect_files_direct(
                 root_dir, 
                 &*traversal, 
                 &*filters, 
                 &mut results, 
                 self.config.max_depth.unwrap_or(std::usize::MAX),
                 0
-            );
-            results
+            ) {
+                warn!("Error during direct file collection: {}", e);
+            }
+            debug!("Direct collection completed. Found {} matching files", results.len());
+            Ok(results)
         }
     }
     
@@ -153,30 +212,52 @@ impl FileFinder {
         results: &mut Vec<PathBuf>,
         max_depth: usize,
         current_depth: usize,
-    ) {
+    ) -> Result<()> {
         if current_depth >= max_depth || !traversal.should_process_directory(dir) {
-            return;
+            return Ok(());
         }
         
-        if let Ok(entries) = std::fs::read_dir(dir) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path.is_dir() {
-                    Self::collect_files_direct(
-                        &path,
-                        traversal,
-                        filters,
-                        results,
-                        max_depth,
-                        current_depth + 1,
-                    );
-                } else if path.is_file() && traversal.should_process_file(&path) {
-                    if FilterResult::Accept == filters.apply_all(&path) {
-                        results.push(path);
-                    }
+        let entries = std::fs::read_dir(dir)
+            .with_context(|| format!("Failed to read directory: {}", dir.display()))?;
+            
+        for entry_result in entries {
+            let entry = match entry_result {
+                Ok(entry) => entry,
+                Err(e) => {
+                    warn!("Failed to read directory entry: {}", e);
+                    continue;
+                }
+            };
+            
+            let path = entry.path();
+            
+            let file_type = match entry.file_type() {
+                Ok(ft) => ft,
+                Err(e) => {
+                    warn!("Failed to determine file type for {}: {}", path.display(), e);
+                    continue;
+                }
+            };
+            
+            if file_type.is_dir() {
+                if let Err(e) = Self::collect_files_direct(
+                    &path,
+                    traversal,
+                    filters,
+                    results,
+                    max_depth,
+                    current_depth + 1,
+                ) {
+                    warn!("Error collecting files in subdirectory {}: {}", path.display(), e);
+                }
+            } else if file_type.is_file() && traversal.should_process_file(&path) {
+                if FilterResult::Accept == filters.apply_all(&path) {
+                    results.push(path);
                 }
             }
         }
+        
+        Ok(())
     }
 }
 
@@ -188,45 +269,66 @@ fn process_directory(
     observer_registry: &Arc<ObserverRegistry>,
     config: &FinderConfig,
     current_depth: &mut Vec<String>,
-) {
+) -> Result<()> {
     // Check depth limit
     if let Some(max_depth) = config.max_depth {
         if current_depth.len() >= max_depth {
-            return;
+            return Ok(());
         }
     }
     
     if !traversal_strategy.should_process_directory(dir_path) {
-        return;
+        return Ok(());
     }
     
     observer_registry.notify_directory_processed(dir_path);
     
     // Try to read directory entries
-    let entries = match std::fs::read_dir(dir_path) {
-        Ok(entries) => entries,
-        Err(_) => return,
-    };
+    let entries = std::fs::read_dir(dir_path)
+        .with_context(|| format!("Failed to read directory entries for: {}", dir_path.display()))?;
     
-    for entry in entries.flatten() {
+    for entry_result in entries {
+        let entry = match entry_result {
+            Ok(entry) => entry,
+            Err(e) => {
+                warn!("Failed to read directory entry: {}", e);
+                continue;
+            }
+        };
+        
         let path = entry.path();
+        
         let file_type = match entry.file_type() {
             Ok(ft) => ft,
-            Err(_) => continue,
+            Err(e) => {
+                warn!("Failed to determine file type for {}: {}", path.display(), e);
+                continue;
+            }
         };
         
         if file_type.is_dir() {
+            // Skip symbolic links to directories if not following links
+            if file_type.is_symlink() && !config.follow_links {
+                debug!("Skipping symbolic link to directory: {}", path.display());
+                continue;
+            }
+            
             // Push directory name to track depth
             if let Some(dir_name) = path.file_name().and_then(|n| n.to_str()) {
                 current_depth.push(dir_name.to_string());
-                process_directory(
+                
+                // Process subdirectory and handle errors
+                if let Err(e) = process_directory(
                     &path, 
                     traversal_strategy, 
                     filter_registry, 
                     observer_registry, 
                     config, 
                     current_depth
-                );
+                ) {
+                    warn!("Error processing subdirectory {}: {}", path.display(), e);
+                }
+                
                 current_depth.pop();
             }
         } else if file_type.is_file() && traversal_strategy.should_process_file(&path) {
@@ -238,39 +340,59 @@ fn process_directory(
             }
         } else if file_type.is_symlink() && config.follow_links {
             // Follow symlinks if enabled
-            if let Ok(target) = std::fs::read_link(&path) {
-                let target_path = if target.is_absolute() {
-                    target
-                } else {
-                    // Make path relative to the symlink's directory
-                    let parent = path.parent().unwrap_or(Path::new(""));
-                    parent.join(&target)
-                };
-                
-                if let Ok(metadata) = std::fs::metadata(&target_path) {
-                    if metadata.is_dir() {
-                        if let Some(dir_name) = target_path.file_name().and_then(|n| n.to_str()) {
-                            current_depth.push(dir_name.to_string());
-                            process_directory(
-                                &target_path,
-                                traversal_strategy,
-                                filter_registry,
-                                observer_registry,
-                                config,
-                                current_depth,
-                            );
-                            current_depth.pop();
-                        }
-                    } else if metadata.is_file() && traversal_strategy.should_process_file(&target_path) {
-                        match filter_registry.apply_all(&target_path) {
-                            FilterResult::Accept => {
-                                observer_registry.notify_file_found(&target_path);
+            match std::fs::read_link(&path) {
+                Ok(target) => {
+                    let target_path = if target.is_absolute() {
+                        target
+                    } else {
+                        // Make path relative to the symlink's directory
+                        let parent = path.parent().unwrap_or(Path::new(""));
+                        parent.join(&target)
+                    };
+                    
+                    match std::fs::metadata(&target_path) {
+                        Ok(metadata) => {
+                            if metadata.is_dir() {
+                                // Process the directory the symlink points to
+                                if let Some(dir_name) = path.file_name().and_then(|n| n.to_str()) {
+                                    current_depth.push(dir_name.to_string());
+                                    
+                                    if let Err(e) = process_directory(
+                                        &target_path,
+                                        traversal_strategy,
+                                        filter_registry,
+                                        observer_registry,
+                                        config,
+                                        current_depth
+                                    ) {
+                                        warn!("Error processing symlinked directory {}: {}", 
+                                              target_path.display(), e);
+                                    }
+                                    
+                                    current_depth.pop();
+                                }
+                            } else if metadata.is_file() && traversal_strategy.should_process_file(&target_path) {
+                                // Process the file the symlink points to
+                                match filter_registry.apply_all(&target_path) {
+                                    FilterResult::Accept => {
+                                        observer_registry.notify_file_found(&target_path);
+                                    }
+                                    _ => {}
+                                }
                             }
-                            _ => {}
+                        }
+                        Err(e) => {
+                            warn!("Failed to get metadata for symlink target {}: {}", 
+                                  target_path.display(), e);
                         }
                     }
+                }
+                Err(e) => {
+                    warn!("Failed to read symlink {}: {}", path.display(), e);
                 }
             }
         }
     }
+    
+    Ok(())
 } 
