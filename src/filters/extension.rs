@@ -24,19 +24,15 @@ impl Filter for ExtensionFilter {
             return FilterResult::Accept;
         }
 
-        if let Some(ext) = path.extension() {
-            if ext.to_string_lossy() == self.extension || self.extension == "*" {
+        match path.extension() {
+            Some(ext) if ext.to_string_lossy() == self.extension || self.extension == "*" => {
                 FilterResult::Accept
-            } else {
-                FilterResult::Reject
             }
-        } else {
-            // Accept files without extension if the filter is looking for files without extension
-            if self.extension.is_empty() {
+            None if self.extension.is_empty() => {
+                // Accept files without extension if the filter is looking for files without extension
                 FilterResult::Accept
-            } else {
-                FilterResult::Reject
             }
+            _ => FilterResult::Reject
         }
     }
 } 
