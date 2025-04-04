@@ -6,8 +6,8 @@ use std::{
     sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
 
-use anyhow::{Context, Result};
-use log::{debug, warn};
+use anyhow::Result;
+use log::warn;
 
 use crate::{
     core::observer::{NullObserver, SearchObserver},
@@ -149,13 +149,7 @@ impl ObserverRegistry {
     // Helper method to safely acquire read lock
     fn read_observers(&self) -> Result<RwLockReadGuard<'_, Vec<Arc<dyn SearchObserver>>>> {
         self.observers.read()
-            .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: poisoned lock"))
-    }
-
-    // Helper method to safely acquire write lock
-    fn write_observers(&self) -> Result<RwLockWriteGuard<'_, Vec<Arc<dyn SearchObserver>>>> {
-        self.observers.write()
-            .map_err(|e| anyhow::anyhow!("Failed to acquire write lock: poisoned lock"))
+            .map_err(|_| anyhow::anyhow!("Failed to acquire read lock: poisoned lock"))
     }
 
     /// Notify all observers that a file was found
