@@ -1,13 +1,11 @@
 use anyhow::{Result, Context};
-use log::{info, debug};
+use log::info;
 use std::sync::Arc;
-use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use crate::commands::Command;
 use crate::core::{FileSearchConfig, FinderFactory};
 use crate::core::observer::{SearchObserver, SilentObserver, TrackingObserver};
-use crate::core::registry::ObserverRegistry;
 use crate::utils::search_directory;
 
 /// Command for searching files
@@ -16,9 +14,9 @@ pub struct SearchCommand<'a> {
     start_time: Instant,
 }
 
-impl<'a> SearchCommand<'a> {
+impl SearchCommand<'_> {
     /// Create a new search command
-    pub fn new(config: &'a FileSearchConfig) -> Self {
+    pub fn new(config: &FileSearchConfig) -> SearchCommand<'_> {
         Self {
             config,
             start_time: Instant::now(),
@@ -49,20 +47,9 @@ impl<'a> SearchCommand<'a> {
         
         Ok(app_config)
     }
-    
-    /// Get a configured observer registry with tracking
-    fn create_observer_registry(&self) -> (Arc<ObserverRegistry>, Arc<TrackingObserver>) {
-        let registry = Arc::new(ObserverRegistry::new());
-        let tracker = Arc::new(TrackingObserver::new());
-        
-        // Register the tracker as an observer
-        registry.register_arc(Arc::clone(&tracker) as Arc<dyn SearchObserver>);
-        
-        (registry, tracker)
-    }
 }
 
-impl<'a> Command for SearchCommand<'a> {
+impl Command for SearchCommand<'_> {
     /// Execute the search command
     fn execute(&self) -> Result<()> {
         let app_config = self.create_app_config()?;
@@ -120,7 +107,7 @@ impl<'a> Command for SearchCommand<'a> {
     }
 }
 
-impl<'a> SearchCommand<'a> {
+impl SearchCommand<'_> {
     /// Display the search results
     fn display_results(&self, files: &[std::path::PathBuf]) -> Result<()> {
         let elapsed = self.start_time.elapsed();
