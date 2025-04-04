@@ -39,8 +39,7 @@ fn main() {
         .filter(None, log_level)
         .init();
     
-    // Display application banner
-    display_banner();
+    // No longer display the banner here - it will be shown only in help command
     
     // Run the application and handle errors
     if let Err(err) = run(&args) {
@@ -88,8 +87,8 @@ fn create_command(config: &FileSearchConfig) -> Result<Box<dyn Command + '_>> {
     Ok(Box::new(SearchCommand::new(config)))
 }
 
-/// Display a welcome message
-fn display_banner() {
+/// Display a welcome message - will now only be called from help command
+pub fn display_banner() {
     println!("  ____                 _     ");
     println!(" / __ \\               | |    ");
     println!("| |  | | __ _  __ _ _ | |__  ");

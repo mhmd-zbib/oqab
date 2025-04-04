@@ -20,7 +20,10 @@ impl Default for HelpCommand {
 
 impl Command for HelpCommand {
     fn execute(&self) -> Result<()> {
-        // Display help text
+        // Display banner first
+        crate::display_banner();
+        
+        // Then display help text
         println!("{}", get_help_text());
         
         Ok(())
