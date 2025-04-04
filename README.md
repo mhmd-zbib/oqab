@@ -1,18 +1,24 @@
-# Oqab File Finder
+# Oqab Search Utility
 
-A high-performance file discovery utility written in Rust, designed for efficient searching and filtering of files across complex directory structures.
+A high-performance search utility written in Rust, designed for efficient content and file searching across complex directory structures.
 
 ## Overview
 
-Oqab (Arabic for "eagle") is a command-line utility that provides advanced file searching capabilities with a focus on performance, flexibility, and usability. It allows users to quickly locate files based on various criteria including extension, name pattern, file size, and modification date.
+Oqab is a command-line utility that provides advanced searching capabilities with a focus on performance, flexibility, and usability. It allows users to quickly search through file contents and locate files based on various criteria including content patterns, file extension, name pattern, file size, and modification date.
 
 ## Key Features
 
-- **Multi-threaded Processing**: Leverages parallel execution for significantly faster file system traversal
+- **Multi-threaded Processing**: Leverages parallel execution for significantly faster searching
+- **Comprehensive Search Capabilities**:
+  - Content-based search within files
+  - Pattern matching in file contents
+  - Regular expression support
+  - Case-sensitive/insensitive search options
 - **Dual Search Modes**:
   - Standard search for common use cases
   - Advanced search with optimized worker pools for handling large file systems
 - **Comprehensive Filtering**:
+  - Content pattern matching
   - Extension-based filtering
   - Name pattern matching
   - Size constraints (minimum/maximum)
@@ -48,19 +54,24 @@ cargo build --release
 
 ### Basic Usage
 
-Find all Rust source files in the current directory:
+Search for content in all files:
 ```bash
-oqab --ext rs
+oqab --search "pattern"
 ```
 
-Search for files in a specific directory:
+Search for content in specific file types:
 ```bash
-oqab --path /path/to/search --ext txt
+oqab --search "pattern" --ext txt
 ```
 
-Find files matching a specific name pattern:
+Find files containing specific content in a directory:
 ```bash
-oqab --path . --name config
+oqab --path /path/to/search --search "pattern" --ext rs
+```
+
+Case-insensitive content search:
+```bash
+oqab --search "pattern" --ignore-case
 ```
 
 ### Advanced Filtering
@@ -106,6 +117,8 @@ oqab [OPTIONS]
 OPTIONS:
   -h, --help                   Display this help message
   -p, --path <DIR>             Directory to search in
+  -s, --search <PATTERN>       Content pattern to search for
+  -i, --ignore-case            Perform case-insensitive search
   -e, --ext <EXT>              File extension to search for (e.g., 'rs' or '.rs')
   -n, --name <PATTERN>         Filter by file name pattern
   --min-size <SIZE>            Minimum file size (e.g., '10kb', '1MB')
@@ -129,6 +142,8 @@ Example configuration file:
 ```json
 {
   "path": "/home/user/projects",
+  "search_pattern": "TODO",
+  "ignore_case": true,
   "file_extension": "rs",
   "file_name": "test",
   "advanced_search": true,
