@@ -30,11 +30,13 @@ pub enum ArgsError {
 #[command(version = "1.0.0")]
 #[command(about = "High-performance file search utility")]
 #[command(disable_help_flag = true)]
-#[command(override_usage = "oqab [OPTIONS] [QUERY]\n       oqab [QUERY]\n       oqab --grep PATTERN [OPTIONS]")]
+#[command(override_usage = "oqab [QUERY]\n       oqab [OPTIONS] [QUERY]\n       oqab --grep PATTERN [OPTIONS]")]
 pub struct Args {
     /// Search query (file name pattern or text to search for)
+    /// Examples: 'main.rs', '*.txt', 'config', etc.
     #[arg(index = 1)]
     pub query: Option<String>,
+    
     /// Display help information
     #[arg(short = 'h', long = "help")]
     pub help: bool,
@@ -43,11 +45,13 @@ pub struct Args {
     #[arg(short = 'p', long = "path")]
     pub path: Option<String>,
 
-    /// File extension to search for
+    /// File extension to search for (alternative to specifying in QUERY)
+    /// Only use this if you want to override extension detection from QUERY
     #[arg(short = 'e', long = "ext")]
     pub extension: Option<String>,
 
-    /// File name pattern to search for
+    /// File name pattern to search for (alternative to using QUERY)
+    /// Only use this if you need more complex patterns than QUERY allows
     #[arg(short = 'n', long = "name")]
     pub name: Option<String>,
     
@@ -98,6 +102,14 @@ pub struct Args {
     /// No recursive search
     #[arg(short = 'r', long = "no-recursive")]
     pub no_recursive: bool,
+
+    /// Enable fuzzy matching for file names
+    #[arg(short = 'z', long = "fuzzy")]
+    pub fuzzy: bool,
+
+    /// Fuzzy match threshold (0-100, higher means stricter matching)
+    #[arg(long = "fuzzy-threshold")]
+    pub fuzzy_threshold: Option<u8>,
 
     /// Follow symlinks
     #[arg(short = 'f', long = "follow-symlinks")]
@@ -163,8 +175,52 @@ impl Args {
         if let Some(path) = &self.path {
             config.path = Some(path.clone());
         }
-        config.file_extension = self.extension.clone();
-        config.file_name = self.name.clone();
+        
+        // Smart query processing
+        if let Some(query) = &self.query {
+            // If grep pattern is explicitly provided, don't override it with query
+            if self.pattern.is_none() {
+                // Check if query contains wildcard characters or looks like a grep pattern
+                if query.contains('*') || query.contains('?') || query.contains('[') {
+                    // It's likely a file pattern search
+                    if self.name.is_none() {
+                        config.file_name = Some(query.clone());
+                    }
+                } else if query.contains('.') {
+                    // Check if it's a filename with extension
+                    let parts: Vec<&str> = query.rsplitn(2, '.').collect();
+                    if parts.len() == 2 && !parts[0].is_empty() && !parts[1].is_empty() {
+                        // Looks like filename.ext format
+                        if self.name.is_none() {
+                            config.file_name = Some(query.clone());
+                        }
+                        if self.extension.is_none() && config.file_extension.is_none() {
+                            // Only set extension if not already specified
+                            // parts[0] is the extension because we used rsplitn
+                            config.file_extension = Some(parts[0].to_string());
+                        }
+                    } else {
+                        // Just use as filename pattern
+                        if self.name.is_none() {
+                            config.file_name = Some(query.clone());
+                        }
+                    }
+                } else {
+                    // Simple text, use as filename pattern
+                    if self.name.is_none() {
+                        config.file_name = Some(query.clone());
+                    }
+                }
+            }
+        }
+        
+        // Apply explicit command-line options (these override the smart query detection)
+        if let Some(ext) = &self.extension {
+            config.file_extension = Some(ext.clone());
+        }
+        if let Some(name) = &self.name {
+            config.file_name = Some(name.clone());
+        }
         config.pattern = self.pattern.clone();
         config.ignore_case = self.ignore_case;
         config.line_number = self.line_number;
@@ -199,10 +255,17 @@ impl Args {
         config.newer_than = self.newer_than.clone();
         config.older_than = self.older_than.clone();
         
-        // Other settings
-        config.show_progress = !self.quiet && !self.silent;
+        // UI settings
+        config.show_progress = !self.silent;
+        config.quiet_mode = self.quiet;
         config.recursive = !self.no_recursive;
         config.follow_symlinks = self.follow_symlinks;
+        
+        // Fuzzy search settings
+        config.fuzzy = self.fuzzy;
+        if let Some(threshold) = self.fuzzy_threshold {
+            config.fuzzy_threshold = Some(threshold);
+        }
     }
     
     /// Parse a human-readable size string into bytes

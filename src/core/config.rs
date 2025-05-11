@@ -50,6 +50,14 @@ pub struct FileSearchConfig {
     /// Whether to show only filenames of files containing the pattern
     #[serde(default)]
     pub files_with_matches: bool,
+
+    /// Whether to use fuzzy matching for file names
+    #[serde(default)]
+    pub fuzzy: bool,
+
+    /// Fuzzy match threshold (0-100, higher means stricter matching)
+    #[serde(default)]
+    pub fuzzy_threshold: Option<u8>,
     
     /// Whether to display help information
     #[serde(default)]
@@ -66,6 +74,10 @@ pub struct FileSearchConfig {
     /// Whether to show progress during search
     #[serde(default = "default_show_progress")]
     pub show_progress: bool,
+    
+    /// Whether to use quiet mode (less verbose output)
+    #[serde(default)]
+    pub quiet_mode: bool,
     
     /// Whether to search recursively in subdirectories
     #[serde(default = "default_recursive")]
@@ -115,6 +127,7 @@ impl FileSearchConfig {
             advanced_search: false,
             thread_count: None,
             show_progress: true,
+            quiet_mode: false,
             recursive: true,
             follow_symlinks: false,
             traversal_mode: TraversalMode::default(),
@@ -122,6 +135,8 @@ impl FileSearchConfig {
             max_size: None,
             newer_than: None,
             older_than: None,
+            fuzzy: false,
+            fuzzy_threshold: None,
         }
     }
     
@@ -204,6 +219,9 @@ pub struct AppConfig {
     
     /// Whether to show progress during search
     pub show_progress: Option<bool>,
+    
+    /// Whether to use quiet mode (less verbose output)
+    pub quiet: Option<bool>,
 }
 
 impl Default for AppConfig {
@@ -222,6 +240,7 @@ impl Default for AppConfig {
             threads: Some(num_cpus::get()),
             follow_links: Some(false),
             show_progress: Some(true),
+            quiet: Some(false),
         }
     }
 } 

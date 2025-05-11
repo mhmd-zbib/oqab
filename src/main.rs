@@ -4,7 +4,7 @@ use env_logger::Env;
 use log::{error, info, warn, LevelFilter};
 
 use oqab::core::{ConfigManager, FileSearchConfig, Platform};
-use oqab::commands::{Command, HelpCommand, SearchCommand, GrepCommand};
+use oqab::commands::{Command, HelpCommand, SearchCommand, GrepCommand, FuzzyCommand};
 
 fn main() {
     // Parse command line arguments
@@ -96,6 +96,12 @@ fn create_command(config: &FileSearchConfig) -> Result<Box<dyn Command + '_>> {
     if config.pattern.is_some() {
         info!("Using text pattern search mode");
         return Ok(Box::new(GrepCommand::new(config)));
+    }
+    
+    // If fuzzy search is enabled, use the FuzzyCommand
+    if config.fuzzy {
+        info!("Using fuzzy search mode");
+        return Ok(Box::new(FuzzyCommand::new(config)));
     }
     
     // Otherwise, use the standard file search

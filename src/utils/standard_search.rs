@@ -179,6 +179,8 @@ fn walk_directory(
     Ok(())
 }
 
+
+
 /// Check if a file matches the configured criteria
 fn match_file(file_path: &Path, config: &FileSearchConfig) -> bool {
     // Check file extension if specified

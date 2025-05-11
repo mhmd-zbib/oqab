@@ -41,6 +41,7 @@ impl<'a> SearchCommand<'a> {
             threads: self.config.thread_count,
             follow_links: Some(self.config.follow_symlinks),
             show_progress: Some(self.config.show_progress),
+            quiet: Some(self.config.quiet_mode),
         };
         Ok(app_config)
     }
@@ -89,7 +90,10 @@ impl Command for SearchCommand<'_> {
                 min_size: app_config.min_size,
                 max_size: app_config.max_size,
                 newer_than: app_config.newer_than.clone(),
+                fuzzy: false,
+                fuzzy_threshold: None,
                 older_than: app_config.older_than.clone(),
+                quiet_mode: app_config.quiet.unwrap_or(false),
             };
             
             let results = search_directory(

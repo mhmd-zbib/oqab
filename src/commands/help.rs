@@ -42,9 +42,8 @@ impl Command for HelpCommand {
         
         // Print usage section with colors
         println!("{}", style("USAGE:").bold().green());
-        println!("oqab [QUERY]");
-        println!("oqab [OPTIONS] [QUERY]");
-        println!("oqab --grep PATTERN [OPTIONS]
+        println!("oqab [QUERY]                   # Search for files by name or pattern");
+        println!("oqab --grep PATTERN [OPTIONS]  # Search for text within files
 ");
         
         // Print options section with colors
@@ -57,6 +56,8 @@ impl Command for HelpCommand {
         println!("{} Case insensitive search", style("-i, --ignore-case          ").yellow());
         println!("{} Show line numbers in search results", style("--line-number               ").yellow());
         println!("{} Show only filenames of files containing the pattern", style("--files-with-matches        ").yellow());
+        println!("{} Enable fuzzy matching for file names", style("-z, --fuzzy                 ").yellow());
+        println!("{} Fuzzy match threshold (0-100, higher is stricter)", style("--fuzzy-threshold <NUM>     ").yellow());
         println!("{} Suppress progress output", style("-s, --silent                ").yellow());
         println!("{} Quiet mode (less verbose output)", style("-q, --quiet                 ").yellow());
         println!("{} Number of worker threads (default: CPU cores)", style("-w, --workers <NUM>         ").yellow());
@@ -69,12 +70,14 @@ impl Command for HelpCommand {
         println!("# Simple file search by name (searches from root directory)");
         println!("{}", style("oqab main.rs").italic());
         println!();
-        println!("# Find all Rust files in current directory");
-        println!("{}", style("oqab --path . --ext rs").italic());
-        println!("{}", style("oqab -p . -e rs").italic());
+        println!("# Find files by extension");
+        println!("{}", style("oqab *.rs").italic());
         println!();
-        println!("# Find files with 'config' in the filename");
-        println!("{}", style("oqab -p . -n config").italic());
+        println!("# Find files with specific name and extension");
+        println!("{}", style("oqab config.json").italic());
+        println!();
+        println!("# Find files in a specific directory");
+        println!("{}", style("oqab -p /home/user main.rs").italic());
         println!();
         println!("# Search for text within files (grep-like functionality)");
         println!("{}", style("oqab --grep \"function\" -p .").italic());
@@ -84,6 +87,12 @@ impl Command for HelpCommand {
         println!();
         println!("# Search for text only in specific file types");
         println!("{}", style("oqab --grep \"import\" --ext py").italic());
+        println!();
+        println!("# Use fuzzy search to find files with similar names");
+        println!("{}", style("oqab config -z").italic());
+        println!();
+        println!("# Adjust fuzzy search strictness");
+        println!("{}", style("oqab config -z --fuzzy-threshold 70").italic());
         println!();
         println!("# Show only filenames containing matches");
         println!("{}", style("oqab --grep \"TODO\" --files-with-matches").italic());
