@@ -1,45 +1,89 @@
+use console::style;
+
 /// Returns the detailed help text for the application
 pub fn get_help_text() -> String {
-    r#"Oqab File Finder
+    let title = style("Oqab Search Utility").bold().cyan().to_string();
+    let section_title = |title: &str| style(title).bold().green().to_string();
+    let option = |opt: &str| style(opt).yellow().to_string();
+    let example = |ex: &str| style(ex).italic().to_string();
+    
+    format!("{}
 
-USAGE:
-oqab [OPTIONS]
+{}
+oqab [QUERY]
+oqab [OPTIONS] [QUERY]
+oqab --grep PATTERN [OPTIONS]
 
-OPTIONS:
--h, --help                   Display this help message
--p, --path <DIR>             Directory to search in
--e, --ext <EXT>              File extension to search for (e.g., 'rs' or '.rs')
--n, --name <PATTERN>         Filter by file name pattern
--a, --advanced               Use advanced search algorithm with better performance
--s, --silent                 Suppress progress output
--w, --workers <NUM>          Number of worker threads (default: CPU cores)
--c, --config <FILE>          Load settings from a configuration file
---save-config <FILE>         Save current settings to a configuration file
+{}
+{} Display this help message
+{} Directory to search in (default: root directory)
+{} File extension to search for (e.g., 'rs' or '.rs')
+{} Filter by file name pattern
+{} Search for text pattern within files (grep-like functionality)
+{} Case insensitive search
+{} Show line numbers in search results
+{} Show only filenames of files containing the pattern
+{} Suppress progress output
+{} Quiet mode (less verbose output)
+{} Number of worker threads (default: CPU cores)
+{} Load settings from a configuration file
+{} Save current settings to a configuration file
 
-EXAMPLES:
+{}
+# Simple file search by name (searches from root directory)
+{}
+
 # Find all Rust files in current directory
-oqab --path . --ext rs
-oqab -p . -e rs
+{}
+{}
 
 # Find files with 'config' in the filename
-oqab -p . -n config
+{}
 
-# Find Rust files with 'main' in the filename
-oqab -p . -e rs -n main
+# Search for text within files (grep-like functionality)
+{}
 
-# Advanced search with silent output
-oqab -p /path -a -s -e rs
+# Case-insensitive search with line numbers
+{}
 
-# Use specific number of worker threads
-oqab -p . -e rs -w 4
+# Search for text only in specific file types
+{}
+
+# Show only filenames containing matches
+{}
 
 # Save search settings to a config file
-oqab -p . -e rs --save-config myconfig.json
+{}
 
 # Use settings from a config file
-oqab -c myconfig.json
-
-# Load settings but override some options
-oqab -c myconfig.json -p /different/path
-"#.to_string()
+{}
+",
+        title,
+        section_title("USAGE:"),
+        section_title("OPTIONS:"),
+        option("-h, --help                  "),
+        option("-p, --path <DIR>            "),
+        option("-e, --ext <EXT>             "),
+        option("-n, --name <PATTERN>        "),
+        option("-g, --grep <PATTERN>        "),
+        option("-i, --ignore-case          "),
+        option("--line-number               "),
+        option("--files-with-matches        "),
+        option("-s, --silent                "),
+        option("-q, --quiet                 "),
+        option("-w, --workers <NUM>         "),
+        option("-c, --config <FILE>         "),
+        option("--save-config <FILE>        "),
+        section_title("EXAMPLES:"),
+        example("oqab main.rs"),
+        example("oqab --path . --ext rs"),
+        example("oqab -p . -e rs"),
+        example("oqab -p . -n config"),
+        example("oqab --grep \"function\" -p ."),
+        example("oqab --grep \"error\" --ignore-case --line-number"),
+        example("oqab --grep \"import\" --ext py"),
+        example("oqab --grep \"TODO\" --files-with-matches"),
+        example("oqab -p . -e rs --save-config myconfig.json"),
+        example("oqab -c myconfig.json")
+    )
 } 

@@ -28,14 +28,18 @@ pub enum ArgsError {
 #[command(name = "Oqab")]
 #[command(author = "Dev Team")]
 #[command(version = "1.0.0")]
-#[command(about = "High-performance file finding utility")]
+#[command(about = "High-performance file search utility")]
 #[command(disable_help_flag = true)]
+#[command(override_usage = "oqab [OPTIONS] [QUERY]\n       oqab [QUERY]\n       oqab --grep PATTERN [OPTIONS]")]
 pub struct Args {
+    /// Search query (file name pattern or text to search for)
+    #[arg(index = 1)]
+    pub query: Option<String>,
     /// Display help information
     #[arg(short = 'h', long = "help")]
     pub help: bool,
 
-    /// Directory to search
+    /// Directory to search (defaults to current directory, use '/' for root)
     #[arg(short = 'p', long = "path")]
     pub path: Option<String>,
 
@@ -46,6 +50,22 @@ pub struct Args {
     /// File name pattern to search for
     #[arg(short = 'n', long = "name")]
     pub name: Option<String>,
+    
+    /// Text pattern to search for within files (grep-like functionality)
+    #[arg(short = 'g', long = "grep")]
+    pub pattern: Option<String>,
+    
+    /// Case insensitive search
+    #[arg(short = 'i', long = "ignore-case")]
+    pub ignore_case: bool,
+    
+    /// Show line numbers in search results
+    #[arg(long = "line-number")]
+    pub line_number: bool,
+    
+    /// Show only filenames of files containing the pattern
+    #[arg(long = "files-with-matches")]
+    pub files_with_matches: bool,
     
     /// Use advanced search algorithm
     #[arg(short = 'a', long = "advanced")]
@@ -145,6 +165,11 @@ impl Args {
         }
         config.file_extension = self.extension.clone();
         config.file_name = self.name.clone();
+        config.pattern = self.pattern.clone();
+        config.ignore_case = self.ignore_case;
+        config.line_number = self.line_number;
+        config.files_with_matches = self.files_with_matches;
+        config.help = self.help;
         
         // Performance settings
         if let Some(threads) = self.workers {
@@ -217,6 +242,14 @@ impl Args {
         // First convert CLI args to a config
         let mut config = self.to_config();
         
+        // Handle positional argument if present
+        if let Some(query) = &self.query {
+            // If no explicit search type is specified, use the query as file name pattern
+            if config.file_name.is_none() && config.file_extension.is_none() && config.pattern.is_none() {
+                config.file_name = Some(query.clone());
+            }
+        }
+        
         // If a config file is specified, load and merge it
         if let Some(config_file) = &self.config_file {
             // Check if the config file exists
@@ -273,7 +306,7 @@ impl Args {
     /// Validate the generated configuration
     fn validate_config(&self, config: &FileSearchConfig) -> Result<()> {
         // Check if search criteria is present
-        if config.file_extension.is_none() && config.file_name.is_none() && !self.help {
+        if config.file_extension.is_none() && config.file_name.is_none() && config.pattern.is_none() && !self.help {
             warn!("No search criteria specified, behavior may be undefined");
         }
         
@@ -309,6 +342,24 @@ impl Args {
             config.file_name = self.name.clone();
         }
         
+        // Pattern - only override if specified in CLI
+        if self.pattern.is_some() {
+            config.pattern = self.pattern.clone();
+        }
+        
+        // Search options - override if flags are set
+        if self.ignore_case {
+            config.ignore_case = true;
+        }
+        
+        if self.line_number {
+            config.line_number = true;
+        }
+        
+        if self.files_with_matches {
+            config.files_with_matches = true;
+        }
+        
         // Thread count - only override if specified in CLI
         if let Some(threads) = self.workers {
             config.thread_count = Some(threads);
@@ -320,6 +371,11 @@ impl Args {
         }
         
         // Boolean settings require special handling
+        
+        // Help flag - override if help flag is set
+        if self.help {
+            config.help = true;
+        }
         
         // Advanced search - override if advanced flag is set
         if self.advanced {

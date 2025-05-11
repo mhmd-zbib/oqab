@@ -35,6 +35,26 @@ pub struct FileSearchConfig {
     #[serde(default)]
     pub file_name: Option<String>,
     
+    /// Text pattern to search for within files (grep-like functionality)
+    #[serde(default)]
+    pub pattern: Option<String>,
+    
+    /// Whether to use case-insensitive search
+    #[serde(default)]
+    pub ignore_case: bool,
+    
+    /// Whether to show line numbers in search results
+    #[serde(default)]
+    pub line_number: bool,
+    
+    /// Whether to show only filenames of files containing the pattern
+    #[serde(default)]
+    pub files_with_matches: bool,
+    
+    /// Whether to display help information
+    #[serde(default)]
+    pub help: bool,
+    
     /// Whether to use advanced search features
     #[serde(default)]
     pub advanced_search: bool,
@@ -87,6 +107,11 @@ impl FileSearchConfig {
             path: None,
             file_extension: None,
             file_name: None,
+            pattern: None,
+            ignore_case: false,
+            line_number: false,
+            files_with_matches: false,
+            help: false,
             advanced_search: false,
             thread_count: None,
             show_progress: true,

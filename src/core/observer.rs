@@ -221,3 +221,12 @@ impl Clone for TrackingObserver {
     }
 }
 
+/// Create an appropriate observer based on whether progress should be shown
+pub fn create_observer(show_progress: bool) -> Box<dyn SearchObserver> {
+    if show_progress {
+        Box::new(TrackingObserver::new())
+    } else {
+        Box::new(SilentObserver::new())
+    }
+}
+

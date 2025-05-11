@@ -1,10 +1,10 @@
 use std::process;
 use anyhow::{Context, Result};
 use env_logger::Env;
-use log::{error, info, LevelFilter};
+use log::{error, info, warn, LevelFilter};
 
-use oqab::core::config::FileSearchConfig;
-use oqab::commands::{Command, HelpCommand, SearchCommand};
+use oqab::core::{ConfigManager, FileSearchConfig, Platform};
+use oqab::commands::{Command, HelpCommand, SearchCommand, GrepCommand};
 
 fn main() {
     // Parse command line arguments
@@ -50,8 +50,25 @@ fn main() {
 
 fn run(args: &oqab::cli::args::Args) -> Result<()> {
     // Process arguments into a configuration
-    let config = args.process()
+    let mut config = args.process()
         .context("Failed to process arguments into a valid configuration")?;
+    
+    // Check if help is requested
+    let showing_help = args.help || (config.file_extension.is_none() && config.file_name.is_none() && config.pattern.is_none());
+    
+    // Set root directory as default search path if none specified (but not when showing help)
+    if config.path.is_none() && !showing_help {
+        let root_path = Platform::root_directory().to_string_lossy().to_string();
+        warn!("No path specified. Searching from root directory ({}). This may take a long time and require elevated permissions.", root_path);
+        config.path = Some(root_path);
+    } else if let Some(path) = &config.path {
+        if Platform::is_root_path(path) && !showing_help {
+            warn!("Searching from root directory. This may take a long time and require elevated permissions.");
+        }
+    }
+    
+    // Initialize the singleton configuration manager
+    ConfigManager::instance().initialize(config.clone());
     
     // Save configuration if requested
     if args.save_config_file.is_some() {
@@ -70,17 +87,18 @@ fn run(args: &oqab::cli::args::Args) -> Result<()> {
 
 /// Create the appropriate command based on the configuration
 fn create_command(config: &FileSearchConfig) -> Result<Box<dyn Command + '_>> {
-    // Display help if no search criteria provided
-    if config.file_extension.is_none() && config.file_name.is_none() {
+    // Display help if explicitly requested or if no search criteria provided
+    if config.help || (config.file_extension.is_none() && config.file_name.is_none() && config.pattern.is_none()) {
         return Ok(Box::new(HelpCommand::new()));
     }
     
-    // Create search command without redundant logging
-    if config.advanced_search {
-        info!("Using advanced search mode");
-    } else {
-        info!("Using standard search mode");
+    // If a pattern is specified, use the GrepCommand for text search
+    if config.pattern.is_some() {
+        info!("Using text pattern search mode");
+        return Ok(Box::new(GrepCommand::new(config)));
     }
     
+    // Otherwise, use the standard file search
+    info!("Using standard search mode");
     Ok(Box::new(SearchCommand::new(config)))
 }

@@ -78,8 +78,19 @@ fn walk_directory(
     observer.directory_processed(dir_path);
     
     // Try to read directory entries
-    let entries = std::fs::read_dir(dir_path)
-        .with_context(|| format!("Failed to read directory entries for: {}", dir_path.display()))?;
+    let entries = match std::fs::read_dir(dir_path) {
+        Ok(entries) => entries,
+        Err(e) => {
+            // Silently skip directories we don't have permission to access
+            // This is common when searching from root directory
+            if e.kind() == std::io::ErrorKind::PermissionDenied {
+                debug!("Skipping directory due to permission denied: {}", dir_path.display());
+                return Ok(());
+            }
+            // For other errors, return with context
+            return Err(e).with_context(|| format!("Failed to read directory entries for: {}", dir_path.display()));
+        }
+    };
     
     for entry_result in entries {
         let entry = match entry_result {
@@ -110,7 +121,10 @@ fn walk_directory(
             
             // Recursively process subdirectory
             if let Err(e) = walk_directory(&path, config, observer, results) {
-                warn!("Error processing subdirectory {}: {}", path.display(), e);
+                // Only log errors that aren't permission related
+                if !e.to_string().contains("permission denied") {
+                    warn!("Error processing subdirectory {}: {}", path.display(), e);
+                }
             }
         } else if file_type.is_file() {
             let matches = match_file(&path, config);
